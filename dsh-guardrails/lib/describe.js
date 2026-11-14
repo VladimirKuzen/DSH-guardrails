@@ -28,7 +28,18 @@ function text(pack, key, vars = {}) {
   return template === undefined ? key : fill(template, vars);
 }
 
-function actionKey(facts) {
+/** Critical categories get their own wording and always use the block prefix. */
+const CRITICAL_ACTION = {
+  disk: 'action.disk',
+  boot: 'action.boot',
+  systemfiles: 'action.systemfiles',
+  permissions: 'action.permissions',
+  registry: 'action.registry.system',
+  custom: 'action.critical',
+};
+
+function actionKey(facts, verdict) {
+  if (verdict?.severity === 'critical') return CRITICAL_ACTION[facts.criticalCategory] ?? 'action.critical';
   if (facts.kind === 'delete' && facts.recursive === true) return 'action.delete.recursive';
   if (facts.kind === 'create-dir') return 'action.create.dir';
   return `action.${facts.kind}`;
@@ -43,7 +54,8 @@ function actionKey(facts) {
  */
 export function describe(verdict, facts, options = {}) {
   const locales = options.locales ?? LOCALES;
-  const prefixKey = verdict?.mode === 'deny' ? 'prefix.block' : 'prefix.warn';
+  const blocking = verdict?.severity === 'critical' || verdict?.mode === 'deny';
+  const prefixKey = blocking ? 'prefix.block' : 'prefix.warn';
   const rendered = {};
 
   for (const locale of Object.keys(locales)) {
@@ -62,7 +74,7 @@ export function describe(verdict, facts, options = {}) {
       continue;
     }
 
-    body.push(text(pack, actionKey(facts)));
+    body.push(text(pack, actionKey(facts, verdict)));
     if (facts.target !== '') body.push(text(pack, 'seg.target', { path: clipPath(facts.target) }));
     if (facts.kind === 'overwrite') body.push(text(pack, 'seg.existed'));
     if (facts.count === 1) body.push(text(pack, 'seg.count.one'));

@@ -28,6 +28,7 @@ const DEFAULTS = {
   enabled: true,
   rules: {
     protectDshHome: { mode: 'ask', roots: ['~/.dsh', '~/.agents'], alwaysAskTools: ['plugin_manager'] },
+    critical: { mode: 'deny', patterns: [] },
     destructive: { mode: 'ask', patterns: [] },
     secrets: { mode: 'ask', patterns: [] },
   },
@@ -160,6 +161,7 @@ export function apply(ctx, config = {}) {
         ts: new Date().toISOString(),
         rule: verdict.rule,
         mode: verdict.mode,
+        ...(verdict.severity === undefined ? {} : { severity: verdict.severity }),
         tool: exec?.name ?? '?',
         decision: verdict.mode === 'deny' ? 'denied' : 'asked',
         ...(verdict.label === undefined ? {} : { label: verdict.label }),

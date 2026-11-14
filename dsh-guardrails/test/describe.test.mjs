@@ -111,6 +111,29 @@ test('locales: both packs define identical keys and placeholders', () => {
   }
 });
 
+test('describe: a critical verdict uses the block prefix and its category', () => {
+  const disk = describe({ rule: 'R2', severity: 'critical', mode: 'deny', category: 'disk' }, {
+    kind: 'unknown',
+    criticalCategory: 'disk',
+    target: '',
+    reversible: 'no',
+    protectedHit: false,
+  });
+  assert.ok(disk.zh.startsWith('⛔ 磁盘级操作'), disk.zh);
+  assert.ok(disk.en.startsWith('⛔ Disk-level operation'), disk.en);
+
+  const system = describe({ rule: 'R2', severity: 'critical', mode: 'ask', category: 'systemfiles' }, {
+    kind: 'unknown',
+    criticalCategory: 'systemfiles',
+    target: 'C:\\Windows\\System32\\x.dll',
+    reversible: 'no',
+    protectedHit: false,
+  });
+  assert.ok(system.zh.includes('删除/覆盖系统目录内容'));
+  assert.ok(system.zh.includes('C:\\Windows\\System32\\x.dll'));
+  assert.ok(system.en.includes('system directory'));
+});
+
 test('describe: output stays single-line and within the card budget', () => {
   const text = describe({ rule: 'R2', mode: 'ask' }, deleteFacts);
   for (const value of Object.values(text)) {

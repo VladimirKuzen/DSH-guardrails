@@ -19,8 +19,11 @@ const DISPLAY_PATH_MAX = 72;
 
 /** Shell verbs, most specific first: registry/service before generic delete. */
 const KIND_PATTERNS = [
-  [/\breg\s+delete\b/i, 'registry'],
-  [/\bsc\s+delete\b/i, 'service'],
+  [/\breg(?:\.exe)?\s+(?:delete|add|import|load|restore)\b/i, 'registry'],
+  [/\b(?:set-itemproperty|new-itemproperty|remove-itemproperty|new-item|remove-item)\b[^\n]*hk(?:lm|cu|cr|u|cc):/i, 'registry'],
+  [/\bsc(?:\.exe)?\s+(?:delete|create|config|failure)\b|\b(?:new|set)-service\b/i, 'service'],
+  [/\bschtasks(?:\.exe)?\s+\/(?:create|change|delete|run)\b/i, 'scheduled'],
+  [/\bnetsh\s+advfirewall\b|\b(?:set|new|add)-mppreference\b/i, 'firewall'],
   [/\b(?:remove-item|rmdir|ri|del|erase|rd|rm)\b/i, 'delete'],
   [/\b(?:move-item|rename-item|move|mv|ren|rename)\b/i, 'move'],
   [/\b(?:new-item|mkdir)\b/i, 'create'],
@@ -50,6 +53,13 @@ const REVERSIBLE = {
   write: 'unknown',
   plugin: 'unknown',
   protected: 'unknown',
+  scheduled: 'unknown',
+  firewall: 'unknown',
+  disk: 'no',
+  boot: 'no',
+  systemfiles: 'no',
+  permissions: 'no',
+  custom: 'unknown',
   unknown: 'unknown',
 };
 
@@ -212,11 +222,17 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
   const protectedTarget = shell && verdict?.rule === 'R1' ? protectedPath(command, env) : '';
   if (protectedTarget !== '') kind = 'protected';
 
-  const rawTarget = protectedTarget !== ''
-    ? protectedTarget
-    : PATH_TOOLS.has(name)
-      ? pathArgument(args)
-      : commandTarget(action.statement);
+  // A critical verdict knows its own target (the system path it matched).
+  const criticalCategory = verdict?.severity === 'critical' ? str(verdict.category) : '';
+  const criticalTarget = criticalCategory === '' ? '' : str(verdict.target);
+
+  const rawTarget = criticalTarget !== ''
+    ? criticalTarget
+    : protectedTarget !== ''
+      ? protectedTarget
+      : PATH_TOOLS.has(name)
+        ? pathArgument(args)
+        : commandTarget(action.statement);
 
   const shown = displayPath(rawTarget, env);
   const target = isUnresolved(shown) ? '' : shown;
@@ -228,6 +244,7 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
 
   const recursive = RECURSIVE.test(command) ? true : undefined;
   const resolvedKind = kind === 'write' ? (exists === true ? 'overwrite' : 'create') : kind;
+  const reversible = criticalCategory === '' ? (REVERSIBLE[resolvedKind] ?? 'unknown') : 'no';
 
   let count;
   if (exists === true) {
@@ -245,8 +262,10 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
     count,
     recursive,
     lines: lineCount,
-    reversible: REVERSIBLE[resolvedKind] ?? 'unknown',
+    reversible,
     protectedHit: protectedTarget !== '' ? true : underRoots(expandPath(rawTarget, env), roots),
     secretLabel: verdict?.rule === 'R3' ? str(verdict.label) : '',
+    severity: criticalCategory === '' ? undefined : 'critical',
+    criticalCategory,
   };
 }

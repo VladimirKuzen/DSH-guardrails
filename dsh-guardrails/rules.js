@@ -7,8 +7,11 @@
  *   R3 密钥只进配置文件，不进对话
  *
  * Returns null to allow the call; otherwise returns { rule, mode, reason, label }.
+ * Critical Windows operations add { severity: "critical", category, target }.
  * Presentation copy (displayReason) is built by the host in index.js.
  */
+
+import { criticalVerdict, readOnlyDiagnostic } from './lib/critical.js';
 
 /** 会在文件系统上产生写入或删除的 shell 动词。`>` 要求不是 `=>` / `->` / `>>`。 */
 const WRITE_VERBS = /\b(set-content|add-content|copy-item|move-item|remove-item|new-item|out-file|rename-item|clear-content|robocopy|cp|mv|rm|ri|del|erase|rd|ren|mkdir|tee)\b|(?<![=<>-])>(?!>)\s*[A-Za-z"$%]/i;
@@ -19,19 +22,31 @@ export const DEFAULT_DESTRUCTIVE = [
   '(?:^|[\\n;&|(){]\\s*)(remove-item|ri|rm|del|erase|rd|rmdir|clear-content|move-item|mv|move|ren|rename|rename-item)(?=\\s|$)',
   '(?:^|[\\n;&|(){]\\s*)robocopy\\b[^\\n]*\\/(mir|mov|purge)',
   // 只认真正的 format 命令；Format-Table / -Format 这类 PowerShell 参数不算
-  '(?:^|[\\n;&|(){]\\s*)format(\\.com)?(?=\\s|$)',
+  '(?:^|[\\n;&|(){]\\s*)format(\\.(?:com|exe))?(?=\\s|$)',
   '\\bformat-volume\\b',
-  '\\bdiskpart\\b',
+  '\\bdiskpart(?:\\.exe)?\\b',
   '\\bgit\\s+reset\\s+--hard',
   '\\bgit\\s+clean\\s+-[a-z]*f',
   '\\bgit\\s+push\\b[^\\n]*--force',
-  '\\breg\\s+delete\\b',
-  '\\bsc\\s+delete\\b',
-  '\\bschtasks\\s+\\/delete\\b',
-  '\\btakeown\\b',
-  '\\bicacls\\b[^\\n]*\\/(grant|deny|setowner|reset)',
-  '\\bwmic\\b[^\\n]*delete',
-  '\\bnet\\s+user\\b[^\\n]*\\/delete',
+  '\\breg(?:\\.exe)?\\s+delete\\b',
+  '\\bsc(?:\\.exe)?\\s+delete\\b',
+  '\\bschtasks(?:\\.exe)?\\s+\\/delete\\b',
+  '\\btakeown(?:\\.exe)?\\b',
+  '\\bicacls(?:\\.exe)?\\b[^\\n]*\\/(grant|deny|setowner|reset)',
+  '\\bwmic(?:\\.exe)?\\b[^\\n]*delete',
+  '\\bnet(?:\\.exe)?\\s+user\\b[^\\n]*\\/delete',
+  // Registry / service / scheduled task / firewall writes. They are dangerous
+  // but recoverable, so they stay at R2 (ask) rather than the critical tier.
+  '(?:^|[\\n;&|(){]\\s*)(reg(?:\\.exe)?\\s+(?:add|import|load|restore)|sc(?:\\.exe)?\\s+(?:create|config|failure)|schtasks(?:\\.exe)?\\s+\\/(?:create|change|run)|new-service|set-service)\\b',
+  '\\bnetsh\\s+advfirewall\\s+(?:set|reset)\\b',
+  '\\b(?:set|new|add)-mppreference\\b',
+  '\\b(?:set-itemproperty|new-itemproperty|remove-itemproperty|new-item|remove-item)\\b[^\\n]*hk(?:lm|cu|cr|u|cc):',
+  // Disk repair tools: they can rewrite file system or component metadata.
+  '(?:^|[\\n;&|(){]\\s*)chkdsk(?:\\.exe)?\\b[^\\n]*\\/(?:f|r)\\b',
+  '\\bdism(?:\\.exe)?\\b[^\\n]*\\/(?:remove|add)-',
+  // /cleanup-image alone rewrites the component store; scanhealth/checkhealth only read it.
+  '\\bdism(?:\\.exe)?\\b[^\\n]*\\/cleanup-image\\b(?![^\\n]*\\/(?:scanhealth|checkhealth))',
+  '\\bsfc(?:\\.exe)?\\b[^\\n]*\\/scan(?:now|once)\\b',
 ];
 
 /** 密钥特征：默认清单，policy 里可以加。只用于命中，不用于提取。 */
@@ -152,6 +167,42 @@ function labelFor(matchedText) {
   return 'generic-key';
 }
 
+/** Model-facing names for the critical categories; the card copy lives in i18n. */
+const CRITICAL_TEXT = {
+  disk: 'disk-level operation',
+  boot: 'boot configuration change',
+  systemfiles: 'delete/overwrite inside a system directory',
+  permissions: 'permission change on a system directory',
+  registry: 'system registry hive deletion',
+  custom: 'critical operation',
+};
+
+function findCritical(command, env, patterns) {
+  const builtin = criticalVerdict(command, env);
+  if (builtin !== null) return builtin;
+
+  for (const source of patterns) {
+    let re;
+    try {
+      re = new RegExp(source, 'i');
+    } catch {
+      continue;
+    }
+    const hit = re.exec(command);
+    if (hit !== null) return { category: 'custom', detail: (hit[1] ?? hit[0]).trim(), target: '' };
+  }
+  return null;
+}
+
+function criticalReason(critical, mode) {
+  const what = CRITICAL_TEXT[critical.category] ?? 'critical operation';
+  const name = critical.detail === '' ? '' : ` (${critical.detail})`;
+  if (mode === 'deny') {
+    return `Guardrails R2 (critical): ${what}${name} was refused. This can make Windows unbootable or erase data, and the target cannot be verified from text. Take a backup and run it yourself in a terminal if you really mean it.`;
+  }
+  return `Guardrails R2 (critical): ${what}${name} requires explicit approval. This can make Windows unbootable or erase data; verify the target before allowing it.`;
+}
+
 /**
  * 判定一次工具调用。
  * @param {object} policy 解析后的策略
@@ -235,6 +286,27 @@ export function evaluate(policy, call, env) {
         };
       }
     }
+  }
+
+  // ---- R2c 系统级硬停（只读诊断先于破坏性匹配放行）
+  const criticalRule = rules.critical ?? {};
+  if (criticalRule.mode !== 'off' && SHELL_TOOLS.has(name)) {
+    const command = str(args.command ?? args.cmd ?? args.script);
+    const critical = findCritical(command, env, criticalRule.patterns ?? []);
+    if (critical !== null) {
+      const mode = criticalRule.mode === 'ask' ? 'ask' : 'deny';
+      return {
+        rule: 'R2',
+        severity: 'critical',
+        category: critical.category,
+        mode,
+        reason: criticalReason(critical, mode),
+        ...(critical.target === '' ? {} : { target: critical.target }),
+      };
+    }
+    // Read-only diagnostics stay usable; this must run before the R2 patterns,
+    // otherwise `diskpart list disk` would be caught by the bare `diskpart` one.
+    if (readOnlyDiagnostic(command)) return null;
   }
 
   // ---- R2 破坏性操作

@@ -73,6 +73,7 @@ test('R2: 日常命令放行', () => {
     'python price_probe.py --dry-run',
     'git commit -m "rm old files from README"',
     'npm run build',
+    'dism /online /cleanup-image /scanhealth',
   ]) {
     assert.equal(evaluate(policy, call('pwsh', { command }), env), null, command);
   }
@@ -126,6 +127,97 @@ test('模式可切换：deny 与 off', () => {
 
   const secretsOff = { enabled: true, rules: { secrets: { mode: 'off' } } };
   assert.equal(evaluate(secretsOff, call('pwsh', { command: 'echo sk-abcdefghijklmnopqrstuvwxyz' }), env), null);
+});
+
+test('critical: disk and boot operations are denied, not asked', () => {
+  for (const command of [
+    'format D:',
+    'format.com D: /q',
+    'diskpart /s usb.txt',
+    'diskpart.exe /s usb.txt',
+    'bcdedit /set {default} safeboot minimal',
+    'bcdedit.exe /set {default} safeboot minimal',
+    'vssadmin delete shadows /all',
+    'reagentc /disable',
+  ]) {
+    const verdict = evaluate(policy, call('pwsh', { command }), env);
+    assert.equal(verdict?.rule, 'R2', command);
+    assert.equal(verdict.severity, 'critical', command);
+    assert.equal(verdict.mode, 'deny', command);
+    assert.match(verdict.reason, /critical/, command);
+  }
+});
+
+test('critical: system files, permission changes and hives are denied', () => {
+  for (const command of [
+    'Remove-Item "C:\\Windows\\System32\\drivers\\etc\\hosts" -Force',
+    'Set-Content C:\\Windows\\win.ini -Value x',
+    'takeown /f "C:\\Windows\\System32" /r',
+    'icacls "C:\\Program Files\\App" /grant Everyone:F',
+    'reg delete HKLM\\SYSTEM\\CurrentControlSet\\Services\\Foo /f',
+  ]) {
+    const verdict = evaluate(policy, call('pwsh', { command }), env);
+    assert.equal(verdict?.severity, 'critical', command);
+    assert.equal(verdict.mode, 'deny', command);
+  }
+});
+
+test('critical: an ordinary workspace delete stays an ask', () => {
+  const verdict = evaluate(policy, call('pwsh', { command: 'Remove-Item -Recurse C:\\work\\dist' }), env);
+  assert.equal(verdict.rule, 'R2');
+  assert.equal(verdict.severity, undefined);
+  assert.equal(verdict.mode, 'ask');
+});
+
+test('critical: read-only diagnostics are allowed', () => {
+  for (const command of ['diskpart list disk', 'bcdedit /enum', 'vssadmin list shadows', 'reagentc /info', 'Get-Disk | Format-Table']) {
+    assert.equal(evaluate(policy, call('pwsh', { command }), env), null, command);
+  }
+  // A write chained onto a read-only command must still be asked.
+  const chained = evaluate(policy, call('pwsh', { command: 'bcdedit /enum & del D:\\work\\x' }), env);
+  assert.equal(chained?.rule, 'R2');
+  assert.equal(chained.mode, 'ask');
+});
+
+test('critical: policy can downgrade to ask or switch it off', () => {
+  const ask = { enabled: true, rules: { critical: { mode: 'ask' } } };
+  const downgraded = evaluate(ask, call('pwsh', { command: 'format D:' }), env);
+  assert.equal(downgraded.mode, 'ask');
+  assert.equal(downgraded.severity, 'critical');
+
+  const off = { enabled: true, rules: { critical: { mode: 'off' } } };
+  const plain = evaluate(off, call('pwsh', { command: 'format D:' }), env);
+  assert.equal(plain.mode, 'ask');
+  assert.equal(plain.severity, undefined);
+});
+
+test('critical: custom patterns join the critical tier', () => {
+  const custom = { enabled: true, rules: { critical: { mode: 'deny', patterns: ['\\bwipe\\s+disk\\b'] } } };
+  const verdict = evaluate(custom, call('pwsh', { command: 'wipe disk 0' }), env);
+  assert.equal(verdict.severity, 'critical');
+  assert.equal(verdict.category, 'custom');
+});
+
+test('R2: registry, service, scheduled task and firewall writes are asked', () => {
+  for (const command of [
+    'reg add HKLM\\Software\\Foo /v Bar /d 1 /f',
+    'sc config Spooler start= disabled',
+    'schtasks /create /tn Foo /tr bar.exe /sc daily',
+    'netsh advfirewall set allprofiles state off',
+    'Set-MpPreference -DisableRealtimeMonitoring $true',
+    'Set-ItemProperty -Path HKLM:\\Software\\Foo -Name Bar -Value 1',
+    'New-Service -Name Foo -BinaryPathName C:\\x.exe',
+    'chkdsk D: /f',
+    'dism /online /cleanup-image /restorehealth',
+    'sfc /scannow',
+    'reg.exe add HKLM\\Software\\Foo /v Bar /d 1 /f',
+    'sc.exe config Spooler start= disabled',
+    'schtasks.exe /create /tn Foo /tr bar.exe /sc daily',
+  ]) {
+    const verdict = evaluate(policy, call('pwsh', { command }), env);
+    assert.equal(verdict?.rule, 'R2', command);
+    assert.equal(verdict.mode, 'ask', command);
+  }
 });
 
 test('自定义模式可追加', () => {

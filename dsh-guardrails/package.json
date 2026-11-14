@@ -34,7 +34,7 @@
     "README.md"
   ],
   "scripts": {
-    "test": "node test/rules.test.mjs && node test/plugin.smoke.mjs"
+    "test": "node test/rules.test.mjs && node test/facts.test.mjs && node test/describe.test.mjs && node test/replay.test.mjs && node test/critical.test.mjs && node test/plugin.smoke.mjs"
   },
   "dsh": {
     "bundle": {

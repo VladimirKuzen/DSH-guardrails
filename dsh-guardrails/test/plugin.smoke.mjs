@@ -114,3 +114,26 @@ test('打包后的插件：策略文件损坏时沿用上一份，不抛错', as
   const decision = await fn(call('write', { file_path: 'D:\\work\\a.txt', content: 'x' }), next);
   assert.deepEqual(decision, { kind: 'allow' });
 });
+
+test('打包后的插件：磁盘操作直接拒绝，severity 进入审计', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const fn = fakeCtx();
+  const decision = await fn(call('pwsh', { command: 'format D:' }), next);
+  assert.equal(decision.kind, 'deny');
+  assert.match(decision.reason, /critical/);
+
+  const last = auditLines().at(-1);
+  assert.equal(last.rule, 'R2');
+  assert.equal(last.severity, 'critical');
+  assert.equal(last.decision, 'denied');
+});
+
+test('打包后的插件：critical 降级为 ask 时标题用 ⛔ 与事实', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit'), rules: { critical: { mode: 'ask' } } });
+  const fn = fakeCtx();
+  const decision = await fn(call('pwsh', { command: 'Remove-Item "C:\\Windows\\System32\\x.dll" -Force' }), next);
+  assert.equal(decision.kind, 'ask');
+  assert.ok(decision.displayReason.zh.startsWith('⛔'), decision.displayReason.zh);
+  assert.ok(decision.displayReason.zh.includes('系统目录'), decision.displayReason.zh);
+  assert.ok(decision.displayReason.en.includes('system directory'), decision.displayReason.en);
+});
