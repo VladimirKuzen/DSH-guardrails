@@ -201,6 +201,9 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
 
   const action = shell ? actionStatement(command) : { statement: '', kind: '' };
   let kind = classify(call, verdict);
+  // Reserved for a future rule that gates directory creation itself. Under the
+  // current rules a shell `New-Item -ItemType Directory` is only gated when it
+  // touches DSH's home, and that case is rendered as "protected" below.
   if (shell && kind === 'create' && DIRECTORY_ITEM.test(action.statement)) kind = 'create-dir';
 
   // A shell command that touches DSH's home is described by that path: the
