@@ -11,10 +11,12 @@ Windows only.
 | Rule | Fires when | Default |
 |---|---|---|
 | **R1** DSH's own home | A write targets `~/.dsh` or `~/.agents`, a shell command both mentions those directories and carries a write/delete/move verb, or `plugin_manager` is used at all | ask |
-| **R2** Destructive commands | Delete/move/rename in command position, `robocopy /MIR`, `git reset --hard`, `git clean -f`, `format`, `diskpart`, `reg delete`, `sc delete`, `takeown`, `icacls` permission changes | ask |
+| **R2** Destructive commands | Delete/move/rename in command position, `robocopy /MIR`, `git reset --hard`, `git clean -f`, `format`, `diskpart`, `reg add/delete/import`, `sc create/config/delete`, `schtasks`, `netsh advfirewall`, `Set-MpPreference`, `takeown`, `icacls`, `chkdsk /f`, `dism /remove-*`, `sfc /scannow` | ask |
+| **R2 critical** | Formatting/partitioning a disk, `diskpart /s`, boot configuration writers, deleting `HKLM\SYSTEM` or `HKLM\SAM`, writes/deletes/moves inside `%SystemRoot%` or `%ProgramFiles%`, `takeown`/`icacls` aimed at those directories | deny |
 | **R3** Secrets in arguments | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / bearer tokens / private key blocks / `key=...` assignments | deny in shell commands, ask on file writes, label only |
 
-Each rule can be switched to `deny` (refuse outright) or `off`.
+Each rule can be switched to `deny` (refuse outright) or `off`. The critical tier also accepts
+`rules.critical.mode: "ask"` (downgrade to an approval card with a ⛔ prefix) or `"off"` (plain R2).
 
 ## Configuration
 

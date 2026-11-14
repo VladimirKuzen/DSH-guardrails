@@ -49,7 +49,7 @@ P0 开工前置（不改代码）
 |---|---|---|---|
 | P0 | 可安全动手 | S | 备份 + 基线 + 心跳核验 |
 | P1 | 弹窗一句话讲清“做什么、动哪里、多大规模、能否撤销” | M | `lib/facts.js`、`lib/describe.js`、`i18n/` |
-| P1.6 | Windows 系统级操作硬停（磁盘/启动） | S | 见 [p1.6-windows-critical.md](p1.6-windows-critical.md) |
+| P1.6 | Windows 系统级操作硬停（磁盘/启动/系统目录/配置单元） | S | 见 [p1.6-windows-critical.md](p1.6-windows-critical.md)；S1 已实现，S3 live 验收待重启 |
 | P2 | 每次敏感操作可复盘 | M | 审计 v2 + 哈希链 + 查询命令 |
 | P3 | 别人能改、绕过成本变高 | M | 策略 v2、`check` CLI、自保护、契约测试 |
 | P4 | 可分享 | S | MIT LICENSE、README、CI |

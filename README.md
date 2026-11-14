@@ -22,11 +22,21 @@ do not stop any of that. This gate sits on the last hop before execution and ask
 | Rule | Fires when | Default |
 |---|---|---|
 | **R1** Protect DSH's own home | Tool writes inside `~/.dsh` or `~/.agents`; a shell command both mentions those directories and carries a write/delete/move verb; any `plugin_manager` operation | ask |
-| **R2** Destructive operations | Delete/move/rename in command position, `robocopy /MIR`, `git reset --hard`, `git clean -f`, `format`, `diskpart`, `reg delete`, `sc delete`, `takeown`, `icacls` permission changes | ask |
+| **R2** Destructive operations | Delete/move/rename in command position, `robocopy /MIR`, `git reset --hard`, `git clean -f`, `format`, `diskpart`, `reg add/delete/import`, `sc create/config/delete`, `schtasks`, `netsh advfirewall`, `Set-MpPreference`, `takeown`, `icacls`, `chkdsk /f`, `dism /remove-*`, `sfc /scannow` | ask |
+| **R2 critical** (severity) | Formatting/partitioning a disk, `diskpart /s`, boot configuration writers (`bcdedit`, `bootrec`, `vssadmin delete`, `wbadmin delete`, `reagentc`), deleting `HKLM\SYSTEM` or `HKLM\SAM`, writing/deleting/moving anything inside `%SystemRoot%` or `%ProgramFiles%`, `takeown`/`icacls` aimed at those directories | deny |
 | **R3** Secrets in tool arguments | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / bearer tokens / private key blocks / `key=...` assignments | deny in shell commands, ask on file writes (label only) |
 
-Every rule can be set to `ask`, `deny` or `off`. Read-only calls and ordinary writes inside the
-workspace are not touched.
+Every rule can be set to `ask`, `deny` or `off`.
+
+Critical operations are refused instead of asked: one "allow once" click can leave Windows unbootable,
+the target (disk number, partition layout, hive contents) cannot be verified from the command text, and
+the mistake is only visible after a reboot. The refusal returns an English reason to the model; run the
+command yourself in a terminal if you really mean it. Read-only diagnostics (`Get-Disk`,
+`diskpart list disk`, `bcdedit /enum`, `vssadmin list shadows`, `reagentc /info`, `dism /scanhealth`)
+stay allowed, and an ordinary workspace delete is still a normal ask. Set `rules.critical.mode` to
+`ask` to downgrade it to an approval card (⛔ prefix) or `off` to fall back to plain R2.
+
+Read-only calls and ordinary writes inside the workspace are not touched.
 
 R3 is deliberately stricter. The host renders the approval card from the tool call and echoes a shell
 command verbatim, so asking about one would put the secret on screen. A secret inside a shell command
@@ -78,14 +88,16 @@ keeps working in a new one. Freshness plus version is the signal.
   "enabled": true,
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
+    "critical":       { "mode": "deny", "patterns": [] },
     "destructive":    { "mode": "ask", "patterns": [] },
     "secrets":        { "mode": "ask", "patterns": [] }
   }
 }
 ```
 
-`patterns` appends your own regular expressions to the built-in lists. A corrupt policy file is ignored in
-favour of the last good copy — the gate never disappears because of a bad edit.
+`patterns` appends your own regular expressions to the built-in lists. `critical.patterns` adds your own
+regexes to the hard-stop tier; a corrupt policy file is ignored in favour of the last good copy — the gate
+never disappears because of a bad edit.
 
 ## Repository layout
 
@@ -104,8 +116,7 @@ them locally, then encrypts the result with Windows DPAPI (bound to the current 
 No build step, no runtime dependencies. Tests run directly:
 
 ```powershell
-node dsh-guardrails/test/rules.test.mjs
-node dsh-guardrails/test/plugin.smoke.mjs
+npm test   # runs the six test files in order
 ```
 
 Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the child processes that runner spawns.
@@ -116,6 +127,9 @@ Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the chil
   user with local access can edit files directly.
 - **Rules are regex- and path-based.** Obfuscated shell (variable assembly, `cmd /c`, `powershell -enc`)
   can evade the destructive-command patterns; R1's path check is the stronger of the three.
+- **Indirect execution stays invisible.** `powershell -File x.ps1`, `reg import`, `regedit /s`, and a
+  `.reg` file opened outside DSH never pass through the matcher. The critical tier covers command text,
+  not the contents of scripts or hives.
 - **Approval surfaces may not match the plan.** The host renders the decision prompt; the plugin can only
   supply its text.
 - **Audit records the match today, not the outcome.** Logging the human decision is on the roadmap.

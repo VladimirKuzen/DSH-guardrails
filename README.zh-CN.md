@@ -20,10 +20,19 @@ Agent 最危险的时刻，是"一句话"变成"一个动作"的那一秒：它�
 | 规则 | 触发条件 | 默认动作 |
 |---|---|---|
 | **R1** 保护 DSH 自身目录 | 工具写入落在 `~/.dsh` 或 `~/.agents` 下；shell 命令同时提到这些目录并带有写/删/移动动词；任何 `plugin_manager` 操作 | 弹审批 |
-| **R2** 破坏性操作 | 命令位置上的删除/移动/改名，`robocopy /MIR`、`git reset --hard`、`git clean -f`、`format`、`diskpart`、`reg delete`、`sc delete`、`takeown`、`icacls` 改权限 | 弹审批 |
+| **R2** 破坏性操作 | 命令位置上的删除/移动/改名，`robocopy /MIR`、`git reset --hard`、`git clean -f`、`format`、`diskpart`、`reg add/delete/import`、`sc create/config/delete`、`schtasks`、`netsh advfirewall`、`Set-MpPreference`、`takeown`、`icacls`、`chkdsk /f`、`dism /remove-*`、`sfc /scannow` | 弹审批 |
+| **R2 critical**（严重级） | 格式化/分区磁盘、`diskpart /s`、启动配置写入（`bcdedit`、`bootrec`、`vssadmin delete`、`wbadmin delete`、`reagentc`）、删除 `HKLM\SYSTEM` 或 `HKLM\SAM`、写/删/移动 `%SystemRoot%` 或 `%ProgramFiles%` 下的内容、`takeown`/`icacls` 指向这些目录 | 直接拒绝 |
 | **R3** 工具参数里的密钥 | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / Bearer / 私钥块 / `key=...` 赋值 | shell 命令直接拒绝；文件写入弹审批（只记类型） |
 
 每条规则都可以设成 `ask`（弹审批）、`deny`（直接拒绝）或 `off`（关闭）。
+
+**critical 级是直接拒绝，不弹卡片**：一次“允许一次”就可能让 Windows 起不来，磁盘编号、分区表、
+配置单元内容这些目标信息从命令文本里根本确认不了，而且错了要重启才发现。拒绝时会把英文原因
+回给模型；确实要做，请自己到终端里执行。只读诊断（`Get-Disk`、`diskpart list disk`、
+`bcdedit /enum`、`vssadmin list shadows`、`reagentc /info`、`dism /scanhealth`）仍然放行，
+工作区里的普通删除仍然只是弹审批。把 `rules.critical.mode` 设成 `ask` 可以降级为审批卡（⛔ 前缀），
+设成 `off` 则退回普通 R2。
+
 只读调用、以及工作区里的正常写操作，都不受影响。
 
 R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果走“弹审批”，密钥就直接显示在卡片上。
@@ -74,14 +83,15 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
   "enabled": true,
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
+    "critical":       { "mode": "deny", "patterns": [] },
     "destructive":    { "mode": "ask", "patterns": [] },
     "secrets":        { "mode": "ask", "patterns": [] }
   }
 }
 ```
 
-`patterns` 用于在内置清单之外追加你自己的正则。策略文件写坏时会被忽略并沿用上一份好配置——
-门禁不会因为一次误编辑而消失。
+`patterns` 用于在内置清单之外追加你自己的正则；`critical.patterns` 追加到硬停层。策略文件写坏时
+会被忽略并沿用上一份好配置——门禁不会因为一次误编辑而消失。
 
 ## 仓库结构
 
@@ -100,8 +110,7 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 无构建、无运行时依赖，测试直接跑：
 
 ```powershell
-node dsh-guardrails/test/rules.test.mjs
-node dsh-guardrails/test/plugin.smoke.mjs
+npm test   # 依次跑六个测试文件
 ```
 
 要用 `node <文件>` 而不是 `node --test`：DSH 沙箱不允许测试运行器派生子进程。
@@ -111,6 +120,8 @@ node dsh-guardrails/test/plugin.smoke.mjs
 - **不是沙箱。** 它只看得到工具调用。直接粘贴进对话的文本绕过它；有本机权限的人也能直接改文件。
 - **规则基于正则与路径。** 混淆过的 shell（变量拼接、`cmd /c`、`powershell -enc`）可以绕开破坏性命令
   的匹配；三条规则里路径判定（R1）最扎实。
+- **间接执行看不见。** `powershell -File x.ps1`、`reg import`、`regedit /s`、以及在 DSH 之外双击
+  `.reg` 文件，都不经过匹配器。critical 层管的是命令文本，不是脚本或配置单元的内容。
 - **审批界面不完全受插件控制。** 弹窗由宿主渲染，插件只能提供文案。
 - **现在的审计只记录"命中"，不记录"决定"。** 记录人工决策在路线图上。
 - 仅 Windows。
