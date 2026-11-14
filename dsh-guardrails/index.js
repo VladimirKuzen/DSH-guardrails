@@ -15,9 +15,14 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { evaluate } from './rules.js';
+import { collectFacts } from './lib/facts.js';
+import { describe } from './lib/describe.js';
 
 export const name = 'guardrails';
 export const inject = ['tools'];
+
+/** Single source of truth for the heartbeat version. */
+const VERSION = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
 
 const DEFAULTS = {
   enabled: true,
@@ -97,7 +102,7 @@ export function apply(ctx, config = {}) {
       mkdirSync(join(home, 'guardrails'), { recursive: true });
       writeFileSync(join(home, 'guardrails', 'loaded.json'), `${JSON.stringify({
         at: new Date().toISOString(),
-        version: '1.1.0',
+        version: VERSION,
         policyPath,
         pid: process.pid,
       }, null, 2)}\n`, 'utf8');
@@ -169,7 +174,22 @@ export function apply(ctx, config = {}) {
     if (verdict.mode === 'deny') {
       return { kind: 'deny', reason: verdict.reason, info: { name: 'GuardrailsDenied', code: verdict.rule } };
     }
-    return { kind: 'ask', reason: verdict.reason, displayReason: verdict.displayReason };
+
+    // Presentation copy is built here, at the edge, so rules.js stays pure and
+    // without filesystem access. Any failure falls back to the English reason.
+    let displayReason;
+    try {
+      const roots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
+      displayReason = describe(verdict, collectFacts(exec, verdict, envForRules(), { roots }));
+    } catch {
+      displayReason = undefined;
+    }
+
+    return {
+      kind: 'ask',
+      reason: verdict.reason,
+      ...(displayReason === undefined ? {} : { displayReason }),
+    };
   });
 
   ctx.logger?.info?.(`guardrails: policy at ${policyPath}, audit at ${auditDir()}`);

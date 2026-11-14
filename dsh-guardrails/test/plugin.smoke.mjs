@@ -43,12 +43,25 @@ test('打包后的插件：命中红线返回 ask，并写审计', async () => {
   const decision = await fn(call('write', { file_path: 'C:\\Users\\Tester\\.dsh\\AGENTS.md', content: 'x' }), next);
   assert.equal(decision.kind, 'ask');
   assert.match(decision.reason, /R1/);
-  assert.ok(decision.displayReason.zh.includes('红线 R1'));
+  assert.ok(decision.displayReason.zh.includes('AGENTS.md'));
+  assert.ok(decision.displayReason.zh.includes('受保护目录'));
+  assert.ok(decision.displayReason.en.includes('protected directory'));
 
   const lines = auditLines();
   assert.equal(lines.length, 1);
   assert.equal(lines[0].rule, 'R1');
   assert.equal(lines[0].tool, 'write');
+});
+
+test('打包后的插件：审批文案带事实摘要', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const fn = fakeCtx();
+  const decision = await fn(call('pwsh', { command: 'Remove-Item -Recurse .\\dist' }), next);
+  assert.equal(decision.kind, 'ask');
+  assert.ok(decision.displayReason.zh.includes('删除'));
+  assert.ok(decision.displayReason.zh.includes('不可恢复'));
+  assert.ok(decision.displayReason.en.includes('Delete'));
+  assert.ok(decision.displayReason.en.includes('irreversible'));
 });
 
 test('打包后的插件：未命中时透传', async () => {

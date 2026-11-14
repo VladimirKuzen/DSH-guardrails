@@ -26,6 +26,8 @@
     "index.js",
     "rules.js",
     "cordis.patch.yml",
+    "lib",
+    "i18n",
     "locale/*.json",
     "docs",
     "icon.svg",

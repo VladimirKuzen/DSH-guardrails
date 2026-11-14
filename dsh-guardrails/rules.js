@@ -6,7 +6,8 @@
  *   R2 破坏性操作先 dry-run
  *   R3 密钥只进配置文件，不进对话
  *
- * 返回 null 表示放行；否则返回 { rule, mode, reason, displayReason, label }。
+ * Returns null to allow the call; otherwise returns { rule, mode, reason, label }.
+ * Presentation copy (displayReason) is built by the host in index.js.
  */
 
 /** 会在文件系统上产生写入或删除的 shell 动词。`>` 要求不是 `=>` / `->` / `>>`。 */
@@ -156,7 +157,7 @@ function labelFor(matchedText) {
  * @param {object} policy 解析后的策略
  * @param {{name: string, args: unknown}} call 工具调用
  * @param {object} env 形如 { USERPROFILE, DSH_HOME, AGENTS_HOME }
- * @returns {null | {rule: string, mode: string, reason: string, displayReason: {en: string, zh: string}, label?: string}}
+ * @returns {null | {rule: string, mode: string, reason: string, label?: string}}
  */
 export function evaluate(policy, call, env) {
   if (policy === null || typeof policy !== 'object' || policy.enabled === false) return null;
@@ -185,10 +186,6 @@ export function evaluate(policy, call, env) {
             mode: secretRule.mode === 'deny' ? 'deny' : 'ask',
             label,
             reason: `Guardrails R3: tool "${name}" appears to carry a secret (${label}); secrets must live in config files or environment variables, not in tool arguments or conversation.`,
-            displayReason: {
-              en: `Red line R3: this call seems to contain a secret (${label}). Approve only if it must be written into a log — that cannot be undone.`,
-              zh: `红线 R3：这次调用疑似携带密钥（${label}）。批准 = 允许把它写进会话日志，日志一旦写入无法撤回。`,
-            },
           };
         }
       }
@@ -207,10 +204,6 @@ export function evaluate(policy, call, env) {
         rule: 'R1',
         mode,
         reason: `Guardrails R1: tool "${name}" changes DSH's own profile/plugins under the protected home; it requires explicit approval.`,
-        displayReason: {
-          en: `Red line R1: "${name}" modifies DSH's own installation (profile / plugins). Approve only after a dry run and a backup.`,
-          zh: `红线 R1：「${name}」会改动 DSH 自身的配置或插件。请先 dry-run 并备份，再批准。`,
-        },
       };
     }
 
@@ -221,10 +214,6 @@ export function evaluate(policy, call, env) {
           rule: 'R1',
           mode,
           reason: `Guardrails R1: tool "${name}" writes inside DSH's protected home (${target}).`,
-          displayReason: {
-            en: `Red line R1: this write targets DSH's own directory (${target}). Approve only after a dry run and a backup.`,
-            zh: `红线 R1：这次写入落在 DSH 自身目录（${target}）。请先备份再批准。`,
-          },
         };
       }
     }
@@ -236,10 +225,6 @@ export function evaluate(policy, call, env) {
           rule: 'R1',
           mode,
           reason: `Guardrails R1: shell command both references DSH's protected home and writes/moves/deletes files.`,
-          displayReason: {
-            en: 'Red line R1: this shell command touches DSH\'s own directory with a write/delete verb. Approve only after a dry run and a backup.',
-            zh: '红线 R1：这条命令同时涉及 DSH 自身目录和写入/移动/删除。请先备份、先 dry-run，再批准。',
-          },
         };
       }
     }
@@ -264,10 +249,6 @@ export function evaluate(policy, call, env) {
           rule: 'R2',
           mode: destructiveRule.mode === 'deny' ? 'deny' : 'ask',
           reason: `Guardrails R2: destructive shell operation "${shown}" requires explicit approval.`,
-          displayReason: {
-            en: `Red line R2: destructive operation (${shown}). Approve only after a dry run that lists exactly which files change.`,
-            zh: `红线 R2：破坏性操作（${shown}）。批准前请要求先给出「将改动哪些文件」的完整清单。`,
-          },
         };
       }
     }
