@@ -50,6 +50,14 @@ const helperScript = [
   'Remove-Item $tmp -Force',
 ].join('\n');
 
+const envDeleteScript = [
+  '$node="C:\\Users\\Tester\\.dsh\\dsh-runtimes\\node\\bin\\node.exe"',
+  '$p="D:\\work\\dsh-guardrails"',
+  "$env:PRINT_TITLES='1'",
+  "& $node (Join-Path $p 'test\\replay.test.mjs') 2>&1 | Select-String 'backup:|helper:'",
+  'Remove-Item Env:\\PRINT_TITLES',
+].join('\n');
+
 test('replay: the backup script names the protected file, not $bak', () => {
   const text = title(backupScript).zh;
   assert.ok(text.includes('AGENTS.md'), text);
@@ -65,7 +73,24 @@ test('replay: the helper script no longer claims the whole Temp directory', () =
   assert.ok(text.includes('命令'), text);
 });
 
+test('replay: Join-Path does not turn $p into the delete target', () => {
+  const text = describe({ rule: 'R2', mode: 'ask' }, collectFacts(
+    { name: 'pwsh', arguments: { command: envDeleteScript } },
+    { rule: 'R2', mode: 'ask' },
+    env,
+    { io, roots },
+  )).zh;
+  assert.ok(!text.includes('$p'), text);
+  assert.ok(text.includes('命令 5 行'), text);
+});
+
 if (process.env.PRINT_TITLES === '1') {
   console.log('backup:', title(backupScript).zh);
   console.log('helper:', title(helperScript).zh);
+  console.log('envDelete:', describe({ rule: 'R2', mode: 'ask' }, collectFacts(
+    { name: 'pwsh', arguments: { command: envDeleteScript } },
+    { rule: 'R2', mode: 'ask' },
+    env,
+    { io, roots },
+  )).zh);
 }
