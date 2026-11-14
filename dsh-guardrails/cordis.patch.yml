@@ -1,0 +1,11 @@
+# 三条红线的全局门禁。
+#
+# 墙内（Host）插件：监听 tools/pre-execute，命中红线时返回 ask（弹审批）
+# 或 deny（直接拒绝），并把判定写入审计日志。
+#
+# 策略文件默认在 ~/.dsh/guardrails/policy.json；改完不需要重启，
+# 下一次工具调用就会读到（2 秒缓存）。
+- insert:
+    - id: guardrails
+      name: '@vlad/dsh-guardrails'
+      config: {}

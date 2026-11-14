@@ -1,0 +1,19 @@
+# Backups and scratch files
+_backup/
+*.bak
+*.tmp
+
+# Runtime data — never commit
+audit/
+vault/
+*.log
+
+# Local-only remote address (see git-remote.local.txt)
+git-remote.local.txt
+
+# Dependencies and editor state
+node_modules/
+.vscode/
+.idea/
+Thumbs.db
+Desktop.ini

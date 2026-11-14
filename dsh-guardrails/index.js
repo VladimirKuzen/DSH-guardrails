@@ -1,0 +1,177 @@
+/**
+ * dsh-guardrails —— 把三条红线做成"全局环境"：
+ *
+ *   R1 不碰 DSH 自身目录     R2 破坏性操作先 dry-run     R3 密钥不进对话
+ *
+ * 实现方式：监听 `tools/pre-execute` 瀑布，对每次工具调用判定一次。
+ * 命中红线时返回 `ask`（弹出审批，单次放行）或 `deny`（直接拒绝），
+ * 并把"谁、哪条红线、什么时候"写进审计日志——只记标签，绝不记密钥原文。
+ *
+ * 任何内部异常都放行（fail-open）：护栏不能把工具链搞死。
+ */
+
+import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { homedir } from 'node:os';
+import { join } from 'node:path';
+
+import { evaluate } from './rules.js';
+
+export const name = 'guardrails';
+export const inject = ['tools'];
+
+const DEFAULTS = {
+  enabled: true,
+  rules: {
+    protectDshHome: { mode: 'ask', roots: ['~/.dsh', '~/.agents'], alwaysAskTools: ['plugin_manager'] },
+    destructive: { mode: 'ask', patterns: [] },
+    secrets: { mode: 'ask', patterns: [] },
+  },
+};
+
+function dshHome() {
+  const fromEnv = process.env.DSH_HOME;
+  return fromEnv !== undefined && fromEnv.trim() !== '' ? fromEnv.trim() : join(homedir(), '.dsh');
+}
+
+function envForRules() {
+  return {
+    USERPROFILE: process.env.USERPROFILE ?? homedir(),
+    HOME: homedir(),
+    DSH_HOME: dshHome(),
+    AGENTS_HOME: process.env.DSH_AGENTS_HOME ?? join(homedir(), '.agents'),
+  };
+}
+
+/** 深合并：文件里的同名字段覆盖默认，未写的保持默认。 */
+function merge(base, override) {
+  if (override === null || typeof override !== 'object' || Array.isArray(override)) {
+    return override === undefined ? base : override;
+  }
+  const out = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    out[key] = key in base && base[key] !== null && typeof base[key] === 'object' && !Array.isArray(base[key])
+      ? merge(base[key], value)
+      : value;
+  }
+  return out;
+}
+
+function readPolicyFile(path) {
+  try {
+    return JSON.parse(readFileSync(path, 'utf8'));
+  } catch (error) {
+    if (error?.code === 'ENOENT') return null;
+    throw error;
+  }
+}
+
+/** 把命中记录追加到按天切的审计文件。绝不写密钥原文。 */
+function audit(dir, record) {
+  try {
+    mkdirSync(dir, { recursive: true });
+    const at = new Date(record.ts);
+    const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
+    appendFileSync(join(dir, `audit-${day}.jsonl`), `${JSON.stringify(record)}\n`, 'utf8');
+  } catch {
+    // 审计写不进去不影响主流程
+  }
+}
+
+function summarize(exec) {
+  const args = exec?.arguments ?? {};
+  if (typeof args.file_path === 'string') return args.file_path;
+  if (typeof args.path === 'string') return args.path;
+  const command = typeof args.command === 'string' ? args.command : '';
+  return command === '' ? '' : command.length > 120 ? `${command.slice(0, 120)}…` : command;
+}
+
+export function apply(ctx, config = {}) {
+  const home = dshHome();
+  const policyPath = config.policyPath
+    ?? process.env.DSH_GUARDRAILS_POLICY
+    ?? join(home, 'guardrails', 'policy.json');
+
+  /** Rewrite the liveness marker; called on mount and on every audited call. */
+  const heartbeat = () => {
+    try {
+      mkdirSync(join(home, 'guardrails'), { recursive: true });
+      writeFileSync(join(home, 'guardrails', 'loaded.json'), `${JSON.stringify({
+        at: new Date().toISOString(),
+        version: '1.1.0',
+        policyPath,
+        pid: process.pid,
+      }, null, 2)}\n`, 'utf8');
+    } catch {
+      // A failed heartbeat must not affect the gate.
+    }
+  };
+
+  let cache = { at: 0, mtime: -1, policy: merge(DEFAULTS, config.policy ?? {}) };
+
+  const loadPolicy = () => {
+    const now = Date.now();
+    if (now - cache.at < 2_000) return cache.policy;
+    cache.at = now;
+    let mtime = -1;
+    try {
+      mtime = statSync(policyPath).mtimeMs;
+    } catch {
+      cache = { at: now, mtime: -1, policy: merge(DEFAULTS, config.policy ?? {}) };
+      return cache.policy;
+    }
+    if (mtime === cache.mtime) return cache.policy;
+    try {
+      const file = readPolicyFile(policyPath);
+      cache = { at: now, mtime, policy: merge(DEFAULTS, file ?? config.policy ?? {}) };
+    } catch {
+      // 文件写坏了就沿用上一份，不让护栏失效
+    }
+    return cache.policy;
+  };
+
+  const auditDir = () => {
+    const policy = loadPolicy();
+    const configured = typeof policy.auditDir === 'string' ? policy.auditDir : '';
+    if (configured === '') return join(home, 'guardrails', 'audit');
+    return configured
+      .replace(/^~(?=$|[\\/])/, homedir())
+      .replace(/%([A-Za-z_][A-Za-z0-9_]*)%/g, (_, key) => process.env[key] ?? '');
+  };
+
+  ctx.on('tools/pre-execute', async (exec, next) => {
+    let verdict;
+    let policy;
+    try {
+      policy = loadPolicy();
+      if (policy.enabled === false) return next();
+      verdict = evaluate(policy, { name: exec?.name, arguments: exec?.arguments }, envForRules());
+    } catch {
+      return next();
+    }
+    if (verdict === null) return next();
+
+    try {
+      audit(auditDir(), {
+        ts: new Date().toISOString(),
+        rule: verdict.rule,
+        mode: verdict.mode,
+        tool: exec?.name ?? '?',
+        decision: verdict.mode === 'deny' ? 'denied' : 'asked',
+        ...(verdict.label === undefined ? {} : { label: verdict.label }),
+        // R3 只记标签，绝不记原文；R1/R2 记目标路径或命令前缀，便于事后追溯
+        ...(verdict.rule === 'R3' ? {} : { target: summarize(exec) }),
+      });
+    } catch {
+      // 审计失败不影响判定
+    }
+    heartbeat();
+
+    if (verdict.mode === 'deny') {
+      return { kind: 'deny', reason: verdict.reason, info: { name: 'GuardrailsDenied', code: verdict.rule } };
+    }
+    return { kind: 'ask', reason: verdict.reason, displayReason: verdict.displayReason };
+  });
+
+  ctx.logger?.info?.(`guardrails: policy at ${policyPath}, audit at ${auditDir()}`);
+  heartbeat();
+}

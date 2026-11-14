@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "Guardrails for DSH",
+    "description": "Blocks risky tool calls before they run: protects DSH's own home, stops destructive shell commands, and flags secrets in tool arguments. Windows only.",
+    "detail": "docs/DETAIL.md"
+  }
+}

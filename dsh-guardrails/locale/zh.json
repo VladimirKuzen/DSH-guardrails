@@ -1,0 +1,7 @@
+{
+  "meta": {
+    "title": "DSH 护栏",
+    "description": "在执行前拦下高危工具调用：保护 DSH 自身目录、拦截破坏性 shell 命令、识别工具参数里的密钥。仅支持 Windows。",
+    "detail": "docs/DETAIL.zh.md"
+  }
+}

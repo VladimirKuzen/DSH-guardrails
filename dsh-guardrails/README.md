@@ -1,0 +1,44 @@
+# @vlad/dsh-guardrails
+
+A DSH host plugin that gates risky tool calls before execution: **R1** protects DSH's own home,
+**R2** catches destructive shell commands, **R3** flags secrets in tool arguments. Windows only.
+
+Full documentation: [../README.md](../README.md) (English) ·
+[../README.zh-CN.md](../README.zh-CN.md) (中文).
+
+## What it does
+
+Listens on the `tools/pre-execute` waterfall. Each call is evaluated once; a match returns `ask`
+(one-time approval) or `deny`, writes one audit line, and refreshes the heartbeat. Anything that throws
+is allowed through — the gate never bricks the tool chain.
+
+| Rule | Default | Notes |
+|---|---|---|
+| R1 | ask | writes under `~/.dsh` / `~/.agents`, or any `plugin_manager` call |
+| R2 | ask | deletes, moves, `robocopy /MIR`, `git reset --hard`, `format`, `reg delete`, `icacls`… |
+| R3 | ask | secret patterns; audit stores the label only, never the value |
+
+## Configure
+
+- Policy: `~/.dsh/guardrails/policy.json` (hot reloaded within 2 s)
+- Modes per rule: `ask` / `deny` / `off`; `patterns` appends custom regular expressions
+- Audit: `~/.dsh/guardrails/audit/audit-YYYY-MM-DD.jsonl`
+- Heartbeat: `~/.dsh/guardrails/loaded.json` — check mtime and version, not pid
+
+## Install
+
+Link this package into a DSH profile and add it to `dsh.profile.bundles`, then restart DSH.
+Host plugins do not hot-reload. See the repository README for the exact four steps.
+
+## Test
+
+```powershell
+node test/rules.test.mjs
+node test/plugin.smoke.mjs
+```
+
+Use `node <file>`, not `node --test`: the DSH sandbox forbids the child processes that runner spawns.
+
+## License
+
+MIT.

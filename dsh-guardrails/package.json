@@ -1,0 +1,42 @@
+{
+  "name": "@vlad/dsh-guardrails",
+  "version": "1.1.0",
+  "private": true,
+  "description": "Blocks risky DSH tool calls before they run: protects DSH's own home, stops destructive shell commands, and flags secrets in tool arguments. Windows only.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "dsh": ">=0.2.0-0"
+  },
+  "keywords": [
+    "dsh",
+    "deepseek-harness",
+    "plugin",
+    "guardrails",
+    "security",
+    "audit"
+  ],
+  "exports": {
+    ".": "./index.js",
+    "./package.json": "./package.json",
+    "./locale/*.json": "./locale/*.json",
+    "./icon": "./icon.svg"
+  },
+  "files": [
+    "index.js",
+    "rules.js",
+    "cordis.patch.yml",
+    "locale/*.json",
+    "docs",
+    "icon.svg",
+    "README.md"
+  ],
+  "scripts": {
+    "test": "node test/rules.test.mjs && node test/plugin.smoke.mjs"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  }
+}
