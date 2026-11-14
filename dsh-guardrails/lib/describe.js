@@ -9,7 +9,7 @@ import { readFileSync } from 'node:fs';
 
 import { clipPath } from './facts.js';
 
-const readPack = (file) => JSON.parse(readFileSync(new URL(`../locales/${file}`, import.meta.url), 'utf8'));
+const readPack = (file) => JSON.parse(readFileSync(new URL(`../i18n/${file}`, import.meta.url), 'utf8'));
 
 /** Loaded once; a broken pack fails at import time rather than at prompt time. */
 export const LOCALES = Object.freeze({

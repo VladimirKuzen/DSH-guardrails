@@ -48,7 +48,7 @@ P0 开工前置（不改代码）
 | 阶段 | 目标 | 规模 | 主要产出 |
 |---|---|---|---|
 | P0 | 可安全动手 | S | 备份 + 基线 + 心跳核验 |
-| P1 | 弹窗一句话讲清“做什么、动哪里、多大规模、能否撤销” | M | `lib/facts.js`、`lib/describe.js`、`locales/` |
+| P1 | 弹窗一句话讲清“做什么、动哪里、多大规模、能否撤销” | M | `lib/facts.js`、`lib/describe.js`、`i18n/` |
 | P2 | 每次敏感操作可复盘 | M | 审计 v2 + 哈希链 + 查询命令 |
 | P3 | 别人能改、绕过成本变高 | M | 策略 v2、`check` CLI、自保护、契约测试 |
 | P4 | 可分享 | S | MIT LICENSE、README、CI |
@@ -126,7 +126,7 @@ Delete directory (recursive) at D:\work\dist — 42 files, irreversible
 ### 4.3 文案组织
 
 ```
-locales/zh.json     locales/en.json     ← 两个文件，key 集合与占位符必须一致
+i18n/zh.json     i18n/en.json     ← 两个文件，key 集合与占位符必须一致
         └────────────┬─────────────┘
                      ▼
             lib/describe.js：facts + locale 资源 → { en, zh }
@@ -158,7 +158,7 @@ locales/zh.json     locales/en.json     ← 两个文件，key 集合与占位�
 
 | 文件 | 动作 |
 |---|---|
-| `locales/zh.json`、`locales/en.json` | 新增 |
+| `i18n/zh.json`、`i18n/en.json` | 新增 |
 | `lib/facts.js` | 新增（纯函数，可单测） |
 | `lib/describe.js` | 新增（纯函数） |
 | `rules.js` | 改：`displayReason` 改为调用 `describe()`；规则判定逻辑不动 |
@@ -243,7 +243,7 @@ locales/zh.json     locales/en.json     ← 两个文件，key 集合与占位�
 现状缺口：插件源码在 `D:\...\guardrails\dsh-guardrails`，不在 R1 保护范围内，agent 可直接改写 `rules.js`，重启即生效。
 
 - [ ] 新增受保护根（默认指向插件源码目录），任何写入/改名/删除都触发审批
-- [ ] 守卫 `policy.json` 与 `locales/`：允许读，改必须审批
+- [ ] 守卫 `policy.json` 与 `i18n/`：允许读，改必须审批
 - [ ] 文档写明：这不是沙箱，用户有本机权限时仍可直接改文件
 
 ### 6.3 CLI 与契约测试
