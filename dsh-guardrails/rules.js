@@ -191,7 +191,7 @@ export function evaluate(policy, call, env) {
             mode,
             label,
             reason: mode === 'deny'
-              ? `Guardrails R3: a secret (${label}) appears in a shell command, which was refused instead of shown. Do not put secrets in commands; write them to ~/.dsh/secrets/api-keys.json or an environment variable. 检测到密钥：不要把它写进命令；请改用 ~/.dsh/secrets/api-keys.json 或环境变量。`
+              ? `Guardrails R3: a secret (${label}) appears in a shell command, which was refused instead of shown. Do not put secrets in commands; write them to ~/.dsh/secrets/api-keys.json or an environment variable.`
               : `Guardrails R3: tool "${name}" appears to carry a secret (${label}); secrets must live in config files or environment variables, not in tool arguments or conversation.`,
           };
         }
