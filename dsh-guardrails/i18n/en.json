@@ -19,6 +19,16 @@
   "seg.reversible.no": "irreversible",
   "seg.reversible.yes": "reversible",
   "seg.protected": "protected directory",
-  "seg.secret": " ({label})",
-  "seg.secret.generic": " (secret)"
+  "seg.secret.wrap": " ({label})",
+  "seg.secret.generic": " (secret)",
+  "seg.secret.writes": "cannot be undone once written",
+  "secret.ark": "Ark API key",
+  "secret.openai": "OpenAI-style API key",
+  "secret.aws": "AWS access key",
+  "secret.github": "GitHub token",
+  "secret.google": "Google API key",
+  "secret.slack": "Slack token",
+  "secret.generic-key": "key-like value",
+  "secret.bearer": "bearer token",
+  "secret.private-key": "private key"
 }

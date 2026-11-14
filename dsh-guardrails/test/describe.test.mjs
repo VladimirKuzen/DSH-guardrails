@@ -33,7 +33,7 @@ const secretFacts = {
   count: undefined,
   reversible: 'no',
   protectedHit: false,
-  secretLabel: 'Ark API Key',
+  secretLabel: 'ark',
 };
 
 test('describe: recursive delete reads as a verdict, not a rule id', () => {
@@ -60,9 +60,15 @@ test('describe: a deny uses the block prefix', () => {
 
 test('describe: a secret shows its label and no value', () => {
   const text = describe({ rule: 'R3', mode: 'ask' }, secretFacts);
-  assert.equal(text.zh, '⚠ 参数含密钥（Ark API Key）');
-  assert.equal(text.en, '⚠ Secret in arguments (Ark API Key)');
+  assert.equal(text.zh, '⚠ 参数含密钥（火山方舟 Ark API Key）');
+  assert.equal(text.en, '⚠ Secret in arguments (Ark API key)');
   assert.ok(!text.zh.includes('sk-'));
+});
+
+test('describe: a secret about to be written warns that it persists', () => {
+  const text = describe({ rule: 'R3', mode: 'ask' }, { ...secretFacts, tool: 'write' });
+  assert.ok(text.zh.includes('写入后无法撤回'));
+  assert.ok(text.en.includes('cannot be undone once written'));
 });
 
 test('describe: unknown kind still produces a sentence', () => {

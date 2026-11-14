@@ -12,7 +12,7 @@ Windows only.
 |---|---|---|
 | **R1** DSH's own home | A write targets `~/.dsh` or `~/.agents`, a shell command both mentions those directories and carries a write/delete/move verb, or `plugin_manager` is used at all | ask |
 | **R2** Destructive commands | Delete/move/rename in command position, `robocopy /MIR`, `git reset --hard`, `git clean -f`, `format`, `diskpart`, `reg delete`, `sc delete`, `takeown`, `icacls` permission changes | ask |
-| **R3** Secrets in arguments | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / bearer tokens / private key blocks / `key=...` assignments | ask, label only |
+| **R3** Secrets in arguments | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / bearer tokens / private key blocks / `key=...` assignments | deny in shell commands, ask on file writes, label only |
 
 Each rule can be switched to `deny` (refuse outright) or `off`.
 

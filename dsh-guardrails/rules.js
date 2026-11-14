@@ -56,17 +56,17 @@ export const DEFAULT_SECRETS = [
   '-----BEGIN [A-Z ]*PRIVATE KEY-----',
 ];
 
-/** 每个内置密钥模式的短标签，只用于提示，绝不带出原文。 */
+/** Stable ids for each built-in secret pattern; display text lives in i18n. */
 const SECRET_LABELS = [
-  ['ark-', '火山方舟 Ark API Key'],
-  ['sk-', 'OpenAI/Anthropic 风格密钥'],
-  ['AKIA', 'AWS Access Key'],
-  ['gh', 'GitHub Token'],
-  ['AIza', 'Google API Key'],
-  ['xox', 'Slack Token'],
-  ['api', '疑似 key/密码赋值'],
-  ['bearer', 'Bearer Token'],
-  ['-----BEGIN', '私钥'],
+  ['ark-', 'ark'],
+  ['sk-', 'openai'],
+  ['AKIA', 'aws'],
+  ['gh', 'github'],
+  ['AIza', 'google'],
+  ['xox', 'slack'],
+  ['api', 'generic-key'],
+  ['bearer', 'bearer'],
+  ['-----BEGIN', 'private-key'],
 ];
 
 const PATH_TOOLS = new Set(['write', 'edit', 'create_file', 'apply_patch']);
@@ -146,10 +146,10 @@ function mentionsHomeNearWrite(command) {
 
 function labelFor(matchedText) {
   const lower = matchedText.toLowerCase();
-  for (const [prefix, label] of SECRET_LABELS) {
-    if (lower.startsWith(prefix.toLowerCase())) return label;
+  for (const [prefix, id] of SECRET_LABELS) {
+    if (lower.startsWith(prefix.toLowerCase())) return id;
   }
-  return '疑似密钥';
+  return 'generic-key';
 }
 
 /**
@@ -181,11 +181,18 @@ export function evaluate(policy, call, env) {
         const hit = re.exec(text);
         if (hit) {
           const label = labelFor(hit[0]);
+          // The host echoes a shell command verbatim in its approval card, so
+          // asking about one would display the secret. Refuse it instead; a
+          // file write has no such echo and may still be approved.
+          const inShellCommand = SHELL_TOOLS.has(name);
+          const mode = secretRule.mode === 'deny' || inShellCommand ? 'deny' : 'ask';
           return {
             rule: 'R3',
-            mode: secretRule.mode === 'deny' ? 'deny' : 'ask',
+            mode,
             label,
-            reason: `Guardrails R3: tool "${name}" appears to carry a secret (${label}); secrets must live in config files or environment variables, not in tool arguments or conversation.`,
+            reason: mode === 'deny'
+              ? `Guardrails R3: a secret (${label}) appears in a shell command, which was refused instead of shown. Do not put secrets in commands; write them to ~/.dsh/secrets/api-keys.json or an environment variable. 检测到密钥：不要把它写进命令；请改用 ~/.dsh/secrets/api-keys.json 或环境变量。`
+              : `Guardrails R3: tool "${name}" appears to carry a secret (${label}); secrets must live in config files or environment variables, not in tool arguments or conversation.`,
           };
         }
       }

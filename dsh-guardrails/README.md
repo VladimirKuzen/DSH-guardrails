@@ -16,7 +16,7 @@ is allowed through — the gate never bricks the tool chain.
 |---|---|---|
 | R1 | ask | writes under `~/.dsh` / `~/.agents`, or any `plugin_manager` call |
 | R2 | ask | deletes, moves, `robocopy /MIR`, `git reset --hard`, `format`, `reg delete`, `icacls`… |
-| R3 | ask | secret patterns; audit stores the label only, never the value |
+| R3 | deny in shell commands, ask on file writes | secret patterns; audit stores the label only, never the value |
 
 ## Configure
 

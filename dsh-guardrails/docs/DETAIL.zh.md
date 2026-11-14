@@ -11,7 +11,7 @@
 |---|---|---|
 | **R1** DSH 自身目录 | 写入落在 `~/.dsh` 或 `~/.agents`；shell 命令同时提到这些目录并带写/删/移动动词；任何 `plugin_manager` 操作 | 弹审批 |
 | **R2** 破坏性命令 | 命令位置上的删除/移动/改名，`robocopy /MIR`、`git reset --hard`、`git clean -f`、`format`、`diskpart`、`reg delete`、`sc delete`、`takeown`、`icacls` 改权限 | 弹审批 |
-| **R3** 参数里的密钥 | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / Bearer / 私钥块 / `key=...` 赋值 | 弹审批，只记类型 |
+| **R3** 参数里的密钥 | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / Bearer / 私钥块 / `key=...` 赋值 | shell 命令直接拒绝；文件写入弹审批，只记类型 |
 
 每条规则都可以切成 `deny`（直接拒绝）或 `off`（关闭）。
 

@@ -51,9 +51,12 @@ export function describe(verdict, facts, options = {}) {
     const body = [];
 
     if (facts.kind === 'secret') {
-      const label = facts.secretLabel;
-      const tail = label === '' ? text(pack, 'seg.secret.generic') : text(pack, 'seg.secret', { label });
-      body.push(`${text(pack, 'action.secret')}${tail}`);
+      const id = facts.secretLabel;
+      const labelText = id === '' ? '' : (pack[`secret.${id}`] ?? '');
+      const label = labelText === '' ? text(pack, 'seg.secret.generic') : text(pack, 'seg.secret.wrap', { label: labelText });
+      body.push(`${text(pack, 'action.secret')}${label}`);
+      // A file write persists the secret; a shell command never reaches the card.
+      if (facts.tool === 'write' || facts.tool === 'edit') body.push(text(pack, 'seg.secret.writes'));
       rendered[locale] = `${prefix} ${body.join(SEPARATOR[locale] ?? ' ')}`.trim();
       continue;
     }

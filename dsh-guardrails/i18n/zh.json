@@ -19,6 +19,16 @@
   "seg.reversible.no": "不可恢复",
   "seg.reversible.yes": "可恢复",
   "seg.protected": "受保护目录",
-  "seg.secret": "（{label}）",
-  "seg.secret.generic": "（密钥）"
+  "seg.secret.wrap": "（{label}）",
+  "seg.secret.generic": "（密钥）",
+  "seg.secret.writes": "写入后无法撤回",
+  "secret.ark": "火山方舟 Ark API Key",
+  "secret.openai": "OpenAI/Anthropic 风格密钥",
+  "secret.aws": "AWS Access Key",
+  "secret.github": "GitHub Token",
+  "secret.google": "Google API Key",
+  "secret.slack": "Slack Token",
+  "secret.generic-key": "疑似密钥",
+  "secret.bearer": "Bearer Token",
+  "secret.private-key": "私钥"
 }

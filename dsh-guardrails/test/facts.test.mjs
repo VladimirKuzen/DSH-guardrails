@@ -83,10 +83,10 @@ test('facts: an unrecognized command stays unknown', () => {
 test('facts: R3 carries the label and never the value', () => {
   const facts = factsOf(
     { name: 'pwsh', arguments: { command: 'echo sk-abcdefghijklmnopqrstuvwxyz' } },
-    { rule: 'R3', mode: 'ask', label: 'Ark API Key' },
+    { rule: 'R3', mode: 'ask', label: 'ark' },
   );
   assert.equal(facts.kind, 'secret');
-  assert.equal(facts.secretLabel, 'Ark API Key');
+  assert.equal(facts.secretLabel, 'ark');
   assert.ok(!JSON.stringify(facts).includes('sk-abcdefghijklmnopqrstuvwxyz'));
 });
 

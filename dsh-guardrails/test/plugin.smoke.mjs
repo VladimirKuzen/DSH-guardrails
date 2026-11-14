@@ -82,14 +82,29 @@ test('打包后的插件：deny 模式直接拒绝', async () => {
   assert.equal(decision.info.code, 'R2');
 });
 
-test('打包后的插件：R3 审计不含密钥原文', async () => {
+test('打包后的插件：R3 在 shell 命令里直接拒绝，且审计不含密钥原文', async () => {
   writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
   const fn = fakeCtx();
   const secret = 'sk-' + 'a'.repeat(32);
   const decision = await fn(call('pwsh', { command: `export KEY=${secret}` }), next);
-  assert.equal(decision.kind, 'ask');
+  assert.equal(decision.kind, 'deny');
+  assert.match(decision.reason, /api-keys\.json/);
   const raw = readdirSync(join(dir, 'audit')).map((f) => readFileSync(join(dir, 'audit', f), 'utf8')).join('');
   assert.ok(!raw.includes(secret), 'audit 不应包含密钥');
+});
+
+test('打包后的插件：R3 在文件写入里仍然弹审批', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const fn = fakeCtx();
+  const secret = 'sk-' + 'b'.repeat(32);
+  const decision = await fn(call('write', {
+    file_path: 'D:\\work\\secrets.json',
+    content: `{"key":"${secret}"}`,
+  }), next);
+  assert.equal(decision.kind, 'ask');
+  assert.ok(decision.displayReason.zh.includes('参数含密钥'));
+  assert.ok(decision.displayReason.zh.includes('无法撤回'));
+  assert.ok(!decision.displayReason.zh.includes(secret));
 });
 
 test('打包后的插件：策略文件损坏时沿用上一份，不抛错', async () => {

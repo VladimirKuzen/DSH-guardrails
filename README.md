@@ -23,10 +23,14 @@ do not stop any of that. This gate sits on the last hop before execution and ask
 |---|---|---|
 | **R1** Protect DSH's own home | Tool writes inside `~/.dsh` or `~/.agents`; a shell command both mentions those directories and carries a write/delete/move verb; any `plugin_manager` operation | ask |
 | **R2** Destructive operations | Delete/move/rename in command position, `robocopy /MIR`, `git reset --hard`, `git clean -f`, `format`, `diskpart`, `reg delete`, `sc delete`, `takeown`, `icacls` permission changes | ask |
-| **R3** Secrets in tool arguments | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / bearer tokens / private key blocks / `key=...` assignments | ask (label only, never the value) |
+| **R3** Secrets in tool arguments | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / bearer tokens / private key blocks / `key=...` assignments | deny in shell commands, ask on file writes (label only) |
 
 Every rule can be set to `ask`, `deny` or `off`. Read-only calls and ordinary writes inside the
 workspace are not touched.
+
+R3 is deliberately stricter. The host renders the approval card from the tool call and echoes a shell
+command verbatim, so asking about one would put the secret on screen. A secret inside a shell command
+is therefore refused outright; a file write, whose content is never echoed, still asks.
 
 ## How a call is judged
 

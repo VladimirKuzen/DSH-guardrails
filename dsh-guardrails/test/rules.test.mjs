@@ -94,7 +94,20 @@ test('R3: 写文件时正文含密钥也会拦', () => {
     content: `{"apiKey":"${key}"}`,
   }), env);
   assert.equal(rules(verdict), 'R3');
-  assert.equal(verdict.label, '火山方舟 Ark API Key');
+  assert.equal(verdict.label, 'ark');
+});
+
+test('R3: shell 命令直接拒绝，文件写入仍弹审批', () => {
+  const secret = 'sk-abcdefghijklmnopqrstuvwxyz';
+  const shell = evaluate(policy, call('pwsh', { command: `echo ${secret}` }), env);
+  assert.equal(shell.mode, 'deny');
+  assert.match(shell.reason, /api-keys\.json/);
+
+  const write = evaluate(policy, call('write', {
+    file_path: 'D:\\work\\secrets.json',
+    content: `{"key":"${secret}"}`,
+  }), env);
+  assert.equal(write.mode, 'ask');
 });
 
 test('R3: 普通文本不误伤', () => {
