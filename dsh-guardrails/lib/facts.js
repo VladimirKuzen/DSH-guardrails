@@ -27,10 +27,16 @@ const KIND_PATTERNS = [
   [/\b(?:set-content|add-content|out-file|copy-item)\b/i, 'write'],
 ];
 
-const PATH_FLAG = /-(?:literal)?path\s+(?:"([^"]+)"|'([^']+)'|([^\s]+))/i;
+/** A path flag, but not the "-Path" inside "Join-Path" or "Split-Path". */
+const PATH_FLAG = /(?<![\w-])-(?:literal)?path\b\s+(?:"([^"]+)"|'([^']+)'|([^\s]+))/i;
 const QUOTED = /"([^"]+)"|'([^']+)'/g;
 const LOOKS_LIKE_PATH = /^(?:[a-z]:[\\/]|\\\\|\/|\.{1,2}[\\/])/i;
 const RECURSIVE = /(?:-recurse|\/mir\b|\/s\b)/i;
+const DIRECTORY_ITEM = /-itemtype\s+directory\b/i;
+
+/** A path under DSH's own home, whether absolute or written through a variable. */
+const PROTECTED_ABS = /[A-Za-z]:\\[^"'\r\n]*?\.(?:dsh|agents)(?:\\[^"'\r\n]*)?/i;
+const PROTECTED_VAR = /(?:~|\$env:USERPROFILE|%USERPROFILE%)[\\/]\.(?:dsh|agents)[^"'\r\n]*/i;
 
 const REVERSIBLE = {
   delete: 'no',
@@ -40,8 +46,10 @@ const REVERSIBLE = {
   secret: 'no',
   move: 'yes',
   create: 'yes',
+  'create-dir': 'yes',
   write: 'unknown',
   plugin: 'unknown',
+  protected: 'unknown',
   unknown: 'unknown',
 };
 
@@ -62,6 +70,11 @@ export function displayPath(raw, env) {
   return expanded.replace(/\//g, '\\');
 }
 
+/** A value still carrying a variable is not a usable target. */
+export function isUnresolved(value) {
+  return value.includes('$') || /%[A-Za-z_][A-Za-z0-9_]*%/.test(value);
+}
+
 /** Shorten a path for the headline; the audit log keeps the full value. */
 export function clipPath(path) {
   if (path.length <= DISPLAY_PATH_MAX) return path;
@@ -79,7 +92,7 @@ export function pathArgument(args) {
   return '';
 }
 
-/** Best-effort target extraction from a shell command line. */
+/** Best-effort target extraction from one statement or command line. */
 export function commandTarget(command) {
   const text = str(command);
   if (text === '') return '';
@@ -99,6 +112,33 @@ export function commandTarget(command) {
   return '';
 }
 
+/** Split a shell command into statements we can reason about one at a time. */
+export function splitStatements(command) {
+  return str(command)
+    .split(/\r?\n|;|&&|\|\||\|/)
+    .map((part) => part.trim())
+    .filter((part) => part !== '');
+}
+
+/** The first statement that carries a recognised action, with its kind. */
+export function actionStatement(command) {
+  for (const statement of splitStatements(command)) {
+    for (const [pattern, kind] of KIND_PATTERNS) {
+      if (pattern.test(statement)) return { statement, kind };
+    }
+  }
+  return { statement: '', kind: 'unknown' };
+}
+
+/** First path under DSH's home mentioned by a command, displayed. */
+export function protectedPath(command, env) {
+  const text = str(command);
+  const match = PROTECTED_ABS.exec(text) ?? PROTECTED_VAR.exec(text);
+  if (match === null) return '';
+  const shown = displayPath(match[0], env);
+  return isUnresolved(shown) ? '' : shown;
+}
+
 /** Classify the action from the tool name and its arguments. */
 export function classify(call, verdict) {
   const name = str(call?.name);
@@ -113,10 +153,7 @@ export function classify(call, verdict) {
 
   if (SHELL_TOOLS.has(name)) {
     const command = str(args.command ?? args.cmd ?? args.script);
-    for (const [pattern, kind] of KIND_PATTERNS) {
-      if (pattern.test(command)) return kind;
-    }
-    return 'unknown';
+    return actionStatement(command).kind;
   }
 
   return 'unknown';
@@ -148,7 +185,7 @@ function countEntries(io, path) {
  * Collect the facts behind one approval prompt.
  * @param {{name?: string, arguments?: object}} call tool call
  * @param {{rule?: string, label?: string} | null} verdict guardrail verdict
- * @param {object} env path environment ({ USERPROFILE, HOME, DSH_HOME, AGENTS_HOME })
+ * @param {object} env path environment ({ USERPROFILE, HOME, DSH_HOME, AGENTS_HOME, ... })
  * @param {{roots?: string[], io?: {statSync: Function, readdirSync: Function}}} [options]
  */
 export function collectFacts(call, verdict, env = {}, options = {}) {
@@ -160,33 +197,53 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
   const name = str(call?.name);
   const args = call?.arguments ?? {};
   const command = str(args.command ?? args.cmd ?? args.script);
+  const shell = SHELL_TOOLS.has(name);
 
-  const kind = classify(call, verdict);
-  const rawTarget = PATH_TOOLS.has(name) ? pathArgument(args) : commandTarget(command);
+  const action = shell ? actionStatement(command) : { statement: '', kind: '' };
+  let kind = classify(call, verdict);
+  if (shell && kind === 'create' && DIRECTORY_ITEM.test(action.statement)) kind = 'create-dir';
+
+  // A shell command that touches DSH's home is described by that path: the
+  // command may act on several paths, and the protected one is the reason it
+  // was gated at all.
+  const protectedTarget = shell && verdict?.rule === 'R1' ? protectedPath(command, env) : '';
+  if (protectedTarget !== '') kind = 'protected';
+
+  const rawTarget = protectedTarget !== ''
+    ? protectedTarget
+    : PATH_TOOLS.has(name)
+      ? pathArgument(args)
+      : commandTarget(action.statement);
+
   const shown = displayPath(rawTarget, env);
-  const key = shown === '' ? '' : expandPath(rawTarget, env);
+  const target = isUnresolved(shown) ? '' : shown;
+  const lineCount = shell ? command.split(/\r?\n/).filter((line) => line.trim() !== '').length : 0;
 
-  const stat = shown === '' ? undefined : safeStat(io, shown);
+  const stat = target === '' ? undefined : safeStat(io, target);
   const exists = stat === undefined ? undefined : true;
   const isDir = stat === undefined ? undefined : stat.isDirectory();
 
+  const recursive = RECURSIVE.test(command) ? true : undefined;
+  const resolvedKind = kind === 'write' ? (exists === true ? 'overwrite' : 'create') : kind;
+
   let count;
   if (exists === true) {
-    count = isDir === true ? countEntries(io, shown) : 1;
+    if (isDir !== true) count = 1;
+    else if (resolvedKind === 'delete' && recursive === true) count = countEntries(io, target);
+    else if (resolvedKind === 'move') count = countEntries(io, target);
   }
-
-  const resolvedKind = kind === 'write' ? (exists === true ? 'overwrite' : 'create') : kind;
 
   return {
     tool: name,
     kind: resolvedKind,
-    target: shown,
+    target,
     exists,
     isDir,
     count,
-    recursive: RECURSIVE.test(command) ? true : undefined,
+    recursive,
+    lines: lineCount,
     reversible: REVERSIBLE[resolvedKind] ?? 'unknown',
-    protectedHit: underRoots(key, roots),
+    protectedHit: protectedTarget !== '' ? true : underRoots(expandPath(rawTarget, env), roots),
     secretLabel: verdict?.rule === 'R3' ? str(verdict.label) : '',
   };
 }

@@ -120,6 +120,39 @@ test('commandTarget: flag, quoted and bare forms', () => {
   assert.equal(commandTarget('Get-Date'), '');
 });
 
+test('commandTarget: -Path inside Join-Path is not a flag', () => {
+  assert.equal(commandTarget('Join-Path $env:TEMP "x.mjs"'), '');
+});
+
+test('facts: a multi-statement script targets its action statement only', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: "Join-Path $env:TEMP 'x.mjs'\nRemove-Item $tmp -Force" },
+  });
+  assert.equal(facts.kind, 'delete');
+  assert.equal(facts.target, '');
+  assert.equal(facts.lines, 2);
+});
+
+test('facts: New-Item -ItemType Directory reports a directory', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'New-Item -ItemType Directory -Path C:\\work\\d | Out-Null' },
+  });
+  assert.equal(facts.kind, 'create-dir');
+  assert.equal(facts.target, 'C:\\work\\d');
+});
+
+test('facts: R1 shell reports the protected path, not the -Path flag', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'Set-Content -Path "$env:USERPROFILE\\.dsh\\AGENTS.md" -Value x' },
+  }, { rule: 'R1', mode: 'ask' });
+  assert.equal(facts.kind, 'protected');
+  assert.equal(facts.target, 'C:\\Users\\Tester\\.dsh\\AGENTS.md');
+  assert.equal(facts.protectedHit, true);
+});
+
 test('displayPath and clipPath keep the value readable', () => {
   assert.equal(displayPath('$env:USERPROFILE\\.dsh\\x', env), 'C:\\Users\\Tester\\.dsh\\x');
   assert.equal(displayPath('~/.dsh/y', env), 'C:\\Users\\Tester\\.dsh\\y');

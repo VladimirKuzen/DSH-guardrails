@@ -30,6 +30,7 @@ function text(pack, key, vars = {}) {
 
 function actionKey(facts) {
   if (facts.kind === 'delete' && facts.recursive === true) return 'action.delete.recursive';
+  if (facts.kind === 'create-dir') return 'action.create.dir';
   return `action.${facts.kind}`;
 }
 
@@ -66,9 +67,10 @@ export function describe(verdict, facts, options = {}) {
     if (facts.kind === 'overwrite') body.push(text(pack, 'seg.existed'));
     if (facts.count === 1) body.push(text(pack, 'seg.count.one'));
     else if (facts.count !== undefined) body.push(text(pack, 'seg.count', { count: facts.count }));
-    if (facts.protectedHit === true) body.push(text(pack, 'seg.protected'));
+    if (facts.protectedHit === true && facts.kind !== 'protected') body.push(text(pack, 'seg.protected'));
     if (facts.reversible === 'no') body.push(text(pack, 'seg.reversible.no'));
     else if (facts.reversible === 'yes') body.push(text(pack, 'seg.reversible.yes'));
+    if (typeof facts.lines === 'number' && facts.lines > 3) body.push(text(pack, 'seg.lines', { count: facts.lines }));
 
     rendered[locale] = `${prefix} ${body.join(SEPARATOR[locale] ?? ' ')}`.trim();
   }

@@ -78,6 +78,28 @@ test('describe: unknown kind still produces a sentence', () => {
   assert.ok(text.en.includes('Unrecognized action'));
 });
 
+test('describe: a new directory reads as a directory', () => {
+  const text = describe({ rule: 'R2', mode: 'ask' }, {
+    kind: 'create-dir',
+    target: 'C:\\work\\d',
+    reversible: 'yes',
+    protectedHit: false,
+  });
+  assert.equal(text.zh, '⚠ 新建目录｜目标 C:\\work\\d｜可恢复');
+});
+
+test('describe: a long command advertises its line count', () => {
+  const text = describe({ rule: 'R1', mode: 'ask' }, {
+    kind: 'protected',
+    target: 'C:\\Users\\x\\.dsh\\a',
+    reversible: 'unknown',
+    protectedHit: true,
+    lines: 8,
+  });
+  assert.ok(text.zh.includes('命令 8 行'));
+  assert.ok(text.en.includes('8 command lines'));
+});
+
 test('locales: both packs define identical keys and placeholders', () => {
   const zhKeys = Object.keys(LOCALES.zh).sort();
   const enKeys = Object.keys(LOCALES.en).sort();
