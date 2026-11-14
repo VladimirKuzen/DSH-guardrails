@@ -17,6 +17,7 @@ Windows only.
 
 Each rule can be switched to `deny` (refuse outright) or `off`. The critical tier also accepts
 `rules.critical.mode: "ask"` (downgrade to an approval card with a ⛔ prefix) or `"off"` (plain R2).
+`rules.critical.failClosed` (default `true`) keeps that tier refused when rule evaluation itself throws.
 
 ## Configuration
 

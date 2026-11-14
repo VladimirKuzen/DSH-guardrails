@@ -12,7 +12,8 @@ Full documentation: [../README.md](../README.md) (English) ·
 
 Listens on the `tools/pre-execute` waterfall. Each call is evaluated once; a match returns `ask`
 (one-time approval) or `deny`, writes one audit line, and refreshes the heartbeat. Anything that throws
-is allowed through — the gate never bricks the tool chain.
+is allowed through — the gate never bricks the tool chain — except a critical-tier match, which stays
+refused even when evaluation itself failed.
 
 | Rule | Default | Notes |
 |---|---|---|
@@ -25,7 +26,8 @@ is allowed through — the gate never bricks the tool chain.
 
 - Policy: `~/.dsh/guardrails/policy.json` (hot reloaded within 2 s)
 - Modes per rule: `ask` / `deny` / `off`; `patterns` appends custom regular expressions
-  (`rules.critical.mode` also accepts `ask` to downgrade the hard stop to a ⛔ card)
+  (`rules.critical.mode` also accepts `ask` to downgrade the hard stop to a ⛔ card, and
+  `rules.critical.failClosed` defaults to `true`)
 - Audit: `~/.dsh/guardrails/audit/audit-YYYY-MM-DD.jsonl`
 - Heartbeat: `~/.dsh/guardrails/loaded.json` — check mtime and version, not pid
 

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 
-import { evaluate, expandPath, DEFAULT_SECRETS } from '../rules.js';
+import { criticalFallback, evaluate, expandPath, DEFAULT_SECRETS } from '../rules.js';
 
 const env = {
   USERPROFILE: 'C:\\Users\\Tester',
@@ -196,6 +196,34 @@ test('critical: custom patterns join the critical tier', () => {
   const verdict = evaluate(custom, call('pwsh', { command: 'wipe disk 0' }), env);
   assert.equal(verdict.severity, 'critical');
   assert.equal(verdict.category, 'custom');
+});
+
+test('critical: launcher and absolute-path spellings stay denied', () => {
+  for (const command of [
+    'cmd /c "diskpart /s usb.txt"',
+    'cmd /c "reg delete HKLM\\SYSTEM\\Foo /f"',
+    'C:\\Windows\\System32\\format.com D: /q /y',
+    'regedit /s evil.reg',
+  ]) {
+    const verdict = evaluate(policy, call('pwsh', { command }), env);
+    assert.equal(verdict?.severity, 'critical', command);
+    assert.equal(verdict.mode, 'deny', command);
+  }
+  // Text that only mentions a tool is not a critical command.
+  assert.equal(evaluate(policy, call('pwsh', { command: 'Write-Host "format D:"' }), env), null);
+});
+
+test('critical: evaluation failure fails closed for critical commands', () => {
+  const broken = { rules: { critical: {} } }; // defaults: mode deny, failClosed true
+  const denied = criticalFallback(broken, call('pwsh', { command: 'format D:' }), env);
+  assert.equal(denied?.mode, 'deny');
+  assert.equal(denied.severity, 'critical');
+
+  assert.equal(criticalFallback({ rules: { critical: { failClosed: false } } }, call('pwsh', { command: 'format D:' }), env), null);
+  assert.equal(criticalFallback({ rules: { critical: { mode: 'off' } } }, call('pwsh', { command: 'format D:' }), env), null);
+  // Non-critical commands and non-shell tools keep the fail-open path.
+  assert.equal(criticalFallback(broken, call('pwsh', { command: 'Get-Date' }), env), null);
+  assert.equal(criticalFallback(broken, call('write', { file_path: 'D:\\work\\x' }), env), null);
 });
 
 test('R2: registry, service, scheduled task and firewall writes are asked', () => {

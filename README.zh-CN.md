@@ -48,7 +48,9 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 ```
 
 插件是 **fail-open** 的：策略解析或规则判定抛异常时，调用继续执行。护栏不能把工具链搞死。
-如果插件压根没挂载，宿主就在无保护状态下跑——正因为如此才有 `loaded.json`（见下）。
+唯一的例外是 critical 层：判定流程本身坏掉时，仍然命中危险模式的 shell 命令会被拒绝
+（`rules.critical.failClosed`，默认开）。如果插件压根没挂载，宿主就在无保护状态下跑——
+正因为如此才有 `loaded.json`（见下）。
 
 ## 安装
 
@@ -83,15 +85,16 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
   "enabled": true,
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
-    "critical":       { "mode": "deny", "patterns": [] },
+    "critical":       { "mode": "deny", "patterns": [], "failClosed": true },
     "destructive":    { "mode": "ask", "patterns": [] },
     "secrets":        { "mode": "ask", "patterns": [] }
   }
 }
 ```
 
-`patterns` 用于在内置清单之外追加你自己的正则；`critical.patterns` 追加到硬停层。策略文件写坏时
-会被忽略并沿用上一份好配置——门禁不会因为一次误编辑而消失。
+`patterns` 用于在内置清单之外追加你自己的正则；`critical.patterns` 追加到硬停层；
+`critical.failClosed` 让硬停层在判定异常时保持关闭状态。策略文件写坏时会被忽略并沿用上一份好配置——
+门禁不会因为一次误编辑而消失。
 
 ## 仓库结构
 
@@ -118,10 +121,12 @@ npm test   # 依次跑六个测试文件
 ## 已知限制
 
 - **不是沙箱。** 它只看得到工具调用。直接粘贴进对话的文本绕过它；有本机权限的人也能直接改文件。
-- **规则基于正则与路径。** 混淆过的 shell（变量拼接、`cmd /c`、`powershell -enc`）可以绕开破坏性命令
-  的匹配；三条规则里路径判定（R1）最扎实。
-- **间接执行看不见。** `powershell -File x.ps1`、`reg import`、`regedit /s`、以及在 DSH 之外双击
-  `.reg` 文件，都不经过匹配器。critical 层管的是命令文本，不是脚本或配置单元的内容。
+- **规则基于正则与路径。** `cmd /c`、`powershell -Command`、`Start-Process` 和工具的绝对路径会先剥壳再匹配，
+  但变量拼接（`$tool = 'for' + 'mat'`）和 `powershell -EncodedCommand` 仍可能绕开破坏性命令的匹配；
+  三条规则里路径判定（R1）最扎实。
+- **间接执行看不见。** `powershell -File x.ps1`、`reg import`、以及在 DSH 之外双击 `.reg` 文件，
+  都不经过匹配器（`regedit /s` 因脚本不可见已被按 critical 拒绝）。critical 层管的是命令文本，
+  不是脚本或配置单元的内容。
 - **审批界面不完全受插件控制。** 弹窗由宿主渲染，插件只能提供文案。
 - **现在的审计只记录"命中"，不记录"决定"。** 记录人工决策在路线图上。
 - 仅 Windows。

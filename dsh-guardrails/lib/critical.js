@@ -10,9 +10,12 @@
  * Returns a category and a short detail, or null when nothing matched.
  */
 
-const DISK_TOOL = /(?:^|[\n;&|(){])\s*(format(?:\.(?:com|exe))?)(?=\s|$)/i;
+/** Command position, optionally through a quoted absolute path: `& "C:\Windows\System32\format.com"`. */
+const CMD_PREFIX = String.raw`(?:^|[\n;&|(){])\s*["']?(?:[A-Za-z]:\\[^"'\s;|&]*\\)?`;
+
+const DISK_TOOL = new RegExp(String.raw`${CMD_PREFIX}(format(?:\.(?:com|exe))?)["']?(?=\s|$)`, 'i');
 const DISK_CMDLET = /\b(format-volume|clear-disk|initialize-disk|remove-partition)\b/i;
-const DISKPART_CALL = /(?:^|[\n;&|(){])\s*diskpart(?:\.exe)?\b/i;
+const DISKPART_CALL = new RegExp(String.raw`${CMD_PREFIX}diskpart(?:\.exe)?\b`, 'i');
 
 /** Verbs that make a diskpart invocation destructive. */
 const DISKPART_VERB = /\b(clean(?:\s+all)?|format|create\s+partition|delete\s+partition|create\s+volume|delete\s+volume|create\s+vdisk|delete\s+vdisk|convert)\b/i;
@@ -27,7 +30,9 @@ const BOOT_WRITER = [
 ];
 
 /** Registry hives whose deletion can keep Windows from booting. */
-const HIVE_DELETE = /(?:^|[\n;&|(){])\s*reg(?:\.exe)?\s+delete\s+"?hklm\\(system|sam)\b/i;
+const HIVE_DELETE = new RegExp(String.raw`${CMD_PREFIX}reg(?:\.exe)?\s+delete\s+"?hklm\\(system|sam)\b`, 'i');
+/** `regedit /s file.reg` applies an invisible script; treat it like `reg delete`. */
+const REGEDIT_S = new RegExp(String.raw`${CMD_PREFIX}regedit(?:\.exe)?\s+\/s\b`, 'i');
 const HIVE_DELETE_PROVIDER = /\b(?:remove-item|remove-itemproperty|clear-item)\b[^\n]*hklm:\\?(system|sam)\b/i;
 
 /** Verbs that destroy or replace the contents of a path. */
@@ -65,6 +70,35 @@ function statements(command) {
     .split(STATEMENT_SPLIT)
     .map((part) => part.trim())
     .filter((part) => part !== '');
+}
+
+/** Launchers that hide the real command in an argument. */
+const LAUNCHERS = [
+  /^\s*cmd(?:\.exe)?\s+\/[ck]\s+/i,
+  /^\s*(?:powershell|pwsh)(?:\.exe)?\s+-(?:command|encodedcommand)\s+/i,
+  /^\s*start-process\b\s*/i,
+];
+
+/** Returns the command text behind a launcher, or null when there is none. */
+function stripLauncher(part) {
+  for (const pattern of LAUNCHERS) {
+    if (!pattern.test(part)) continue;
+    let rest = part.replace(pattern, '');
+    // `Start-Process -FilePath format ...` names the executable with a flag.
+    rest = rest.replace(/^\s*-filepath\s+/i, '');
+    return rest.replace(/^["']|["']$/g, '').trim();
+  }
+  return null;
+}
+
+/** Quoted fragments, e.g. the payload of `cmd /c "..."`. */
+function quotedSegments(text) {
+  const found = [];
+  for (const match of text.matchAll(/"([^"\r\n]*)"|'([^'\r\n]*)'/g)) {
+    const inner = (match[1] ?? match[2] ?? '').trim();
+    if (inner !== '') found.push(inner);
+  }
+  return found;
 }
 
 /** Case-insensitive environment lookup: Windows keeps the original key casing. */
@@ -136,9 +170,10 @@ function firstMatch(command, patterns) {
  * Detect a Windows critical operation.
  * @param {string} command shell command text
  * @param {object} env environment with SystemRoot / ProgramFiles / USERPROFILE
+ * @param {number} depth recursion depth for nested launcher payloads
  * @returns {null | {category: string, detail: string, target: string}}
  */
-export function criticalVerdict(command, env = {}) {
+export function criticalVerdict(command, env = {}, depth = 0) {
   const text = str(command);
   if (text.trim() === '') return null;
 
@@ -162,6 +197,23 @@ export function criticalVerdict(command, env = {}) {
   // --- System registry hives
   const hive = HIVE_DELETE.exec(text) ?? HIVE_DELETE_PROVIDER.exec(text);
   if (hive !== null) return { category: 'registry', detail: `HKLM\\${hive[1].toUpperCase()}`, target: '' };
+
+  const regedit = REGEDIT_S.exec(text);
+  if (regedit !== null) return { category: 'registry', detail: 'regedit /s', target: '' };
+
+  // --- Commands hidden behind a launcher: cmd /c, powershell -Command, Start-Process
+  if (depth < 2) {
+    for (const part of statements(text)) {
+      const rest = stripLauncher(part);
+      if (rest === null) continue;
+      const nested = criticalVerdict(rest, env, depth + 1);
+      if (nested !== null) return nested;
+      for (const inner of quotedSegments(rest)) {
+        const hit = criticalVerdict(inner, env, depth + 1);
+        if (hit !== null) return hit;
+      }
+    }
+  }
 
   // --- System files and permissions
   const roots = systemRoots(env);
@@ -193,10 +245,14 @@ export function criticalVerdict(command, env = {}) {
  * critical matcher so `diskpart list disk` and `bcdedit /enum` still work.
  */
 export function readOnlyDiagnostic(command) {
-  const parts = statements(command);
+  // Unwrap launchers first so `cmd /c "diskpart list disk"` stays readable.
+  const parts = statements(command)
+    .map((part) => (stripLauncher(part) ?? part).replace(/^["']|["']$/g, '').trim())
+    .filter((part) => part !== '');
   if (parts.length === 0) return false;
 
-  const mutating = DISKPART_VERB.test(command) || DISK_CMDLET.test(command);
+  const flat = parts.join(' ; ');
+  const mutating = DISKPART_VERB.test(flat) || DISK_CMDLET.test(flat);
 
   for (const part of parts) {
     if (/^diskpart\b/i.test(part)) {

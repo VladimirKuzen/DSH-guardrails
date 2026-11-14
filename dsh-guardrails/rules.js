@@ -204,6 +204,28 @@ function criticalReason(critical, mode) {
 }
 
 /**
+ * Fail-closed path for the critical tier: when rule evaluation throws, refuse a
+ * shell call that still matches the critical matcher instead of letting it run.
+ * Returns a deny verdict, or null to fall through to the normal fail-open path.
+ */
+export function criticalFallback(policy, call, env = {}) {
+  const criticalRule = policy?.rules?.critical ?? {};
+  if (criticalRule.mode === 'off' || criticalRule.failClosed === false) return null;
+  if (!SHELL_TOOLS.has(str(call?.name))) return null;
+  const args = call?.arguments ?? {};
+  const command = str(args.command ?? args.cmd ?? args.script);
+  const critical = findCritical(command, env, criticalRule.patterns ?? []);
+  if (critical === null) return null;
+  return {
+    rule: 'R2',
+    severity: 'critical',
+    category: critical.category,
+    mode: 'deny',
+    reason: `${criticalReason(critical, 'deny')} Rule evaluation failed, so the call was refused without a card.`,
+  };
+}
+
+/**
  * 判定一次工具调用。
  * @param {object} policy 解析后的策略
  * @param {{name: string, args: unknown}} call 工具调用

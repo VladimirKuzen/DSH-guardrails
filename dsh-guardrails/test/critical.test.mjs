@@ -113,3 +113,25 @@ test('critical: ".exe" spellings are treated the same', () => {
   assert.equal(category('takeown.exe /f C:\\Windows\\System32 /r'), 'permissions');
   assert.equal(readOnlyDiagnostic('bcdedit.exe /enum'), true);
 });
+
+test('critical: launchers and absolute paths cannot hide a critical command', () => {
+  // cmd /c with the payload in quotes
+  assert.equal(category('cmd /c "diskpart /s usb.txt"'), 'disk');
+  assert.equal(category('cmd /c "reg delete HKLM\\SYSTEM\\Foo /f"'), 'registry');
+  assert.equal(category('cmd /c format D: /q /y'), 'disk');
+  // absolute path to the tool, quoted or not
+  assert.equal(category('C:\\Windows\\System32\\format.com D: /q /y'), 'disk');
+  assert.equal(category('& "C:\\Windows\\System32\\format.com" D: /q /y'), 'disk');
+  assert.equal(category('C:\\Windows\\System32\\diskpart.exe /s usb.txt'), 'disk');
+  // Start-Process, with and without -FilePath
+  assert.equal(category("Start-Process format -ArgumentList 'D:', '/q', '/y'"), 'disk');
+  assert.equal(category("Start-Process -FilePath diskpart -ArgumentList '/s usb.txt'"), 'disk');
+  // regedit /s applies an invisible script
+  assert.equal(category('regedit /s evil.reg'), 'registry');
+});
+
+test('critical: mentioning a tool in output is not a command', () => {
+  assert.equal(criticalVerdict('Write-Host "format D:"', env), null);
+  // A read-only diskpart wrapped in cmd /c stays readable.
+  assert.equal(readOnlyDiagnostic('cmd /c "diskpart list disk"'), true);
+});

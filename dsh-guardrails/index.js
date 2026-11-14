@@ -7,14 +7,16 @@
  * 命中红线时返回 `ask`（弹出审批，单次放行）或 `deny`（直接拒绝），
  * 并把"谁、哪条红线、什么时候"写进审计日志——只记标签，绝不记密钥原文。
  *
- * 任何内部异常都放行（fail-open）：护栏不能把工具链搞死。
+ * 任何内部异常都放行（fail-open）：护栏不能把工具链搞死。唯一的例外是
+ * critical 层——判定本身抛异常时，仍然命中危险模式的 shell 调用会被拒绝
+ * （fail-closed），见下面的 catch 分支。
  */
 
 import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
-import { evaluate } from './rules.js';
+import { criticalFallback, evaluate } from './rules.js';
 import { collectFacts } from './lib/facts.js';
 import { describe } from './lib/describe.js';
 
@@ -28,7 +30,7 @@ const DEFAULTS = {
   enabled: true,
   rules: {
     protectDshHome: { mode: 'ask', roots: ['~/.dsh', '~/.agents'], alwaysAskTools: ['plugin_manager'] },
-    critical: { mode: 'deny', patterns: [] },
+    critical: { mode: 'deny', patterns: [], failClosed: true },
     destructive: { mode: 'ask', patterns: [] },
     secrets: { mode: 'ask', patterns: [] },
   },
@@ -152,6 +154,34 @@ export function apply(ctx, config = {}) {
       if (policy.enabled === false) return next();
       verdict = evaluate(policy, { name: exec?.name, arguments: exec?.arguments }, envForRules());
     } catch {
+      // The critical tier fails closed: if evaluation itself broke, a shell call
+      // that still matches the critical matcher is refused instead of executed.
+      try {
+        const fallback = criticalFallback(
+          policy ?? { rules: { critical: { mode: 'deny' } } },
+          { name: exec?.name, arguments: exec?.arguments },
+          envForRules(),
+        );
+        if (fallback !== null) {
+          try {
+            audit(auditDir(), {
+              ts: new Date().toISOString(),
+              rule: fallback.rule,
+              mode: fallback.mode,
+              severity: fallback.severity,
+              tool: exec?.name ?? '?',
+              decision: 'denied',
+              target: summarize(exec),
+            });
+          } catch {
+            // 审计失败不影响拒绝
+          }
+          heartbeat();
+          return { kind: 'deny', reason: fallback.reason, info: { name: 'GuardrailsDenied', code: fallback.rule } };
+        }
+      } catch {
+        // Fallback itself failed: keep the original fail-open behaviour.
+      }
       return next();
     }
     if (verdict === null) return next();

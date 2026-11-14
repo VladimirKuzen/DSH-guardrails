@@ -15,7 +15,8 @@
 | **R3** 参数里的密钥 | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / Bearer / 私钥块 / `key=...` 赋值 | shell 命令直接拒绝；文件写入弹审批，只记类型 |
 
 每条规则都可以切成 `deny`（直接拒绝）或 `off`（关闭）；critical 级另可用 `rules.critical.mode`
-设成 `ask`（降级为带 ⛔ 的审批卡）或 `off`（退回普通 R2）。
+设成 `ask`（降级为带 ⛔ 的审批卡）或 `off`（退回普通 R2）；`rules.critical.failClosed`（默认开）
+让这一层在判定本身抛异常时仍然保持拒绝。
 
 ## 配置
 

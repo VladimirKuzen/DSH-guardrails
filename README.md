@@ -52,8 +52,10 @@ tool call ──▶ evaluate(policy, call, env) ──▶ null ─────�
 ```
 
 The plugin is **fail-open**: if policy parsing or rule evaluation throws, the call proceeds. A guardrail
-must not brick the tool chain. If the plugin itself never mounts, the host simply runs unguarded —
-`loaded.json` exists so that this state is detectable (see below).
+must not brick the tool chain. The one exception is the critical tier: when evaluation breaks, a shell
+command that still matches the critical matcher is refused instead of run (`rules.critical.failClosed`,
+on by default). If the plugin itself never mounts, the host simply runs unguarded — `loaded.json` exists
+so that this state is detectable (see below).
 
 ## Install
 
@@ -88,7 +90,7 @@ keeps working in a new one. Freshness plus version is the signal.
   "enabled": true,
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
-    "critical":       { "mode": "deny", "patterns": [] },
+    "critical":       { "mode": "deny", "patterns": [], "failClosed": true },
     "destructive":    { "mode": "ask", "patterns": [] },
     "secrets":        { "mode": "ask", "patterns": [] }
   }
@@ -96,8 +98,9 @@ keeps working in a new one. Freshness plus version is the signal.
 ```
 
 `patterns` appends your own regular expressions to the built-in lists. `critical.patterns` adds your own
-regexes to the hard-stop tier; a corrupt policy file is ignored in favour of the last good copy — the gate
-never disappears because of a bad edit.
+regexes to the hard-stop tier; `critical.failClosed` keeps that tier closed when evaluation itself throws.
+A corrupt policy file is ignored in favour of the last good copy — the gate never disappears because of a
+bad edit.
 
 ## Repository layout
 
@@ -125,11 +128,13 @@ Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the chil
 
 - **Not a sandbox.** It sees tool calls only. Text pasted straight into a conversation bypasses it, and a
   user with local access can edit files directly.
-- **Rules are regex- and path-based.** Obfuscated shell (variable assembly, `cmd /c`, `powershell -enc`)
-  can evade the destructive-command patterns; R1's path check is the stronger of the three.
-- **Indirect execution stays invisible.** `powershell -File x.ps1`, `reg import`, `regedit /s`, and a
-  `.reg` file opened outside DSH never pass through the matcher. The critical tier covers command text,
-  not the contents of scripts or hives.
+- **Rules are regex- and path-based.** `cmd /c`, `powershell -Command`, `Start-Process` and absolute tool
+  paths are unwrapped before matching, but variable assembly (`$tool = 'for' + 'mat'`) and encoded commands
+  (`powershell -EncodedCommand`) can still evade the destructive-command patterns; R1's path check is the
+  stronger of the three.
+- **Indirect execution stays invisible.** `powershell -File x.ps1`, `reg import`, and a `.reg` file opened
+  outside DSH never pass through the matcher (`regedit /s` is refused as a critical operation because its
+  script is invisible). The critical tier covers command text, not the contents of scripts or hives.
 - **Approval surfaces may not match the plan.** The host renders the decision prompt; the plugin can only
   supply its text.
 - **Audit records the match today, not the outcome.** Logging the human decision is on the roadmap.
