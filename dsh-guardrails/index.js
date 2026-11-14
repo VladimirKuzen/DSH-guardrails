@@ -180,7 +180,8 @@ export function apply(ctx, config = {}) {
     let displayReason;
     try {
       const roots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
-      displayReason = describe(verdict, collectFacts(exec, verdict, envForRules(), { roots }));
+      const facts = collectFacts(exec, verdict, { ...process.env, ...envForRules() }, { roots });
+      displayReason = describe(verdict, facts);
     } catch {
       displayReason = undefined;
     }

@@ -123,6 +123,11 @@ test('commandTarget: flag, quoted and bare forms', () => {
 test('displayPath and clipPath keep the value readable', () => {
   assert.equal(displayPath('$env:USERPROFILE\\.dsh\\x', env), 'C:\\Users\\Tester\\.dsh\\x');
   assert.equal(displayPath('~/.dsh/y', env), 'C:\\Users\\Tester\\.dsh\\y');
+  // A variable the environment does not know stays visible instead of vanishing.
+  assert.equal(displayPath('$env:UNKNOWN_VAR\\x', env), '$env:UNKNOWN_VAR\\x');
+  assert.equal(displayPath('%UNKNOWN_VAR%\\x', env), '%UNKNOWN_VAR%\\x');
+  // A known variable is expanded when present.
+  assert.equal(displayPath('$env:TEMP\\x', { ...env, TEMP: 'C:\\Temp' }), 'C:\\Temp\\x');
   const long = 'C:\\' + 'a'.repeat(120);
   const clipped = clipPath(long);
   assert.ok(clipped.length <= 72);

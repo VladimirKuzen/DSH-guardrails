@@ -53,10 +53,12 @@ function str(value) {
 export function displayPath(raw, env) {
   const trimmed = str(raw).trim().replace(/^["']|["']$/g, '');
   if (trimmed === '') return '';
+
+  const lookup = (name) => str(env[name]) || str(env[name.toUpperCase()]);
   const expanded = trimmed
-    .replace(/^\$env:([A-Za-z_][A-Za-z0-9_]*)/i, (_, name) => str(env[name]) || str(env[name.toUpperCase()]))
-    .replace(/%([A-Za-z_][A-Za-z0-9_]*)%/g, (_, name) => str(env[name]) || str(env[name.toUpperCase()]))
-    .replace(/^~(?=$|[\\/])/, str(env.USERPROFILE) || str(env.HOME) || '');
+    .replace(/^\$env:([A-Za-z_][A-Za-z0-9_]*)/i, (match, name) => lookup(name) || match)
+    .replace(/%([A-Za-z_][A-Za-z0-9_]*)%/g, (match, name) => lookup(name) || match)
+    .replace(/^~(?=$|[\\/])/, (match) => str(env.USERPROFILE) || str(env.HOME) || match);
   return expanded.replace(/\//g, '\\');
 }
 
