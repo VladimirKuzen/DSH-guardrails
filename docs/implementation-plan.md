@@ -278,7 +278,7 @@ i18n/zh.json     i18n/en.json     ← 两个文件，key 集合与占位符必�
 - [ ] README 里 `~/.dsh/profiles/desktop/...` 改成通用路径
 - [ ] `scripts/` 不进包（个人运维脚本，依赖本机布局）
 - [ ] `policy.json` 只给示例，不带真实根目录
-- [ ] 代码注释英文化（符合 R4，也降低外部贡献门槛）
+- [ ] 代码注释英文化（符合 `constraint.weak.local`，也降低外部贡献门槛）
 
 ### 7.3 包元数据
 
