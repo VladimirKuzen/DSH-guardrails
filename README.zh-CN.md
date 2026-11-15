@@ -10,8 +10,9 @@
 - **可审计**：每次被拦截的调用写一行 JSONL；密钥永远不以明文落盘。
 - **仅 Windows**，1.0 之前。路径语义按 Windows 处理（`~`、`%VAR%`、`$env:VAR`、反斜杠）。
 
-**状态**：v1.2.2。P1.6 系统级硬停已在 Windows 11 上完成 live 验收（2026-11-15）：deny 不弹卡、命令不执行；
-只读诊断正常放行；普通 R2 审批行为不变。探针记录见 `design/p1.6-windows-critical.md` §11。
+**状态**：v1.4.0。P1.6 系统级硬停与审计 v2 已在 Windows 11 上完成 live 验收（2026-11-15）：deny 不弹卡、
+命令不执行；批准后的调用产生完整的 `requested → delivered → outcome → executed` 链并带 payload；
+`--verify` 能校验哈希链。探针记录见 `design/p1.6-windows-critical.md` §11 与 `design/p2-audit-v2.md` §0。
 
 ## 为什么需要它
 
@@ -90,7 +91,16 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
     "critical":       { "mode": "deny", "patterns": [], "failClosed": true },
-    "destructive":    { "mode": "ask", "patterns": [] },
+    "destructive": {
+      "mode": "ask",
+      "patterns": [],
+      "workspaceQuiet": {
+        "enabled": false,
+        "roots": ["D:\\work\\guardrails"],
+        "paths": ["_scratch/", "build/", "dist/"],
+        "alwaysAsk": [".git", ".", ".."]
+      }
+    },
     "secrets":        { "mode": "ask", "patterns": [] }
   }
 }
@@ -100,11 +110,19 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 `critical.failClosed` 让硬停层在判定异常时保持关闭状态。策略文件写坏时会被忽略并沿用上一份好配置——
 门禁不会因为一次误编辑而消失。`audit.format: "v1"` 可退回旧的单文件日志。
 
+`destructive.workspaceQuiet`（默认关闭）只把“清理自己工作区里的临时文件”从弹卡变成静默放行，条件是：
+shell 命令只有一条语句、只有一个目标、不带 `-Recurse`、不含通配符、路径是绝对路径且位于 `roots` 之下、
+并且落在 `paths` 的某一项下层。`-Force` 在上述条件都满足时允许。其余情形照常弹卡；R1、R3 与 critical
+层完全不受影响。若本次会话能拿到真实 cwd 且它不在 `roots` 下，quiet 会整体关闭并写一条 `config-invalid`
+审计；拿不到 cwd 时不做这层交叉验证，只按配置的绝对 `roots` 判断。
+
 ## 审计
 
 每次被拦的调用会写成共享同一个 `id` 的一串事件：闸门处的 `requested`、审批服务接手时的 `delivered`、
-用户或护栏作出决定时的 `outcome`、批准后真正执行完的 `executed`。记录用 `prevHash` 串成哈希链，
-被编辑或截断的行能被发现；命令原文存在 `payload/`（密钥只留哈希）。
+用户或护栏作出决定时的 `outcome`、批准后真正执行完的 `executed`；P1.7 的静默放行写 `allowed`。
+记录用 `prevHash` 串成哈希链，被编辑或截断的行能被发现；命令原文存在 `payload/`（密钥只留哈希）。
+`cwd` 与 `cwdSource`（`session` / `tool` / `null`）记录判定时的工作目录，配置错误写
+`config-invalid`。
 
 离线读取：
 
@@ -135,7 +153,7 @@ node dsh-guardrails/tools/audit-report.mjs --rule R2 --event outcome --show-payl
 无构建、无运行时依赖，测试直接跑：
 
 ```powershell
-npm test   # 依次跑七个测试文件
+npm test   # 依次跑八个测试文件
 ```
 
 要用 `node <文件>` 而不是 `node --test`：DSH 沙箱不允许测试运行器派生子进程。

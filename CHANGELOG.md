@@ -4,6 +4,17 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
+## [1.4.0] - 2026-11-15
+
+- Optional workspace quiet (`rules.destructive.workspaceQuiet`, off by default): a shell call that deletes
+  or moves exactly one target, with no `-Recurse` and no wildcard, at an absolute path under one of the
+  configured `roots` and under one of the `paths`, is allowed without a card. `-Force` is fine when those
+  hold. R1, R3 and the critical tier are untouched, and any other shape still asks.
+- A silent allow is recorded as an `allowed` event (with `quiet: "workspace"` and the payload), so the
+  audit still answers "what was allowed without asking" in v1 mode too.
+- If the session cwd is known and outside `roots`, quiet turns itself off and writes one `config-invalid`
+  record; when no cwd is known that cross-check is skipped and the absolute roots decide alone.
+
 ## [1.3.2] - 2026-11-15
 
 - Audit records now carry `cwd` plus `cwdSource` (`session`, `tool` or `null`): the session working

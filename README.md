@@ -11,9 +11,11 @@ and leaves a local audit trail of what was gated.
 - **Auditable**: every gated call writes one JSONL line; secrets are never written in clear text.
 - **Windows-only**, pre-1.0. Path semantics assume Windows (`~`, `%VAR%`, `$env:VAR`, backslashes).
 
-**Status**: v1.2.2. The P1.6 critical tier was verified live on Windows 11 (2026-11-15): denied calls
-return no card and never execute, read-only diagnostics still run, and ordinary R2 asks are unchanged.
-See [design/p1.6-windows-critical.md](design/p1.6-windows-critical.md) §11 for the probe log.
+**Status**: v1.4.0. The critical tier and the audit v2 stream were verified live on Windows 11
+(2026-11-15): denied calls return no card and never execute, an approved call produces the full
+`requested → delivered → outcome → executed` chain with a payload, and `--verify` validates the hash chain.
+See [design/p1.6-windows-critical.md](design/p1.6-windows-critical.md) §11 and
+[design/p2-audit-v2.md](design/p2-audit-v2.md) §0 for the probe logs.
 
 ## Why
 
@@ -96,7 +98,16 @@ keeps working in a new one. Freshness plus version is the signal.
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
     "critical":       { "mode": "deny", "patterns": [], "failClosed": true },
-    "destructive":    { "mode": "ask", "patterns": [] },
+    "destructive": {
+      "mode": "ask",
+      "patterns": [],
+      "workspaceQuiet": {
+        "enabled": false,
+        "roots": ["D:\\work\\guardrails"],
+        "paths": ["_scratch/", "build/", "dist/"],
+        "alwaysAsk": [".git", ".", ".."]
+      }
+    },
     "secrets":        { "mode": "ask", "patterns": [] }
   }
 }
@@ -107,12 +118,21 @@ regexes to the hard-stop tier; `critical.failClosed` keeps that tier closed when
 A corrupt policy file is ignored in favour of the last good copy — the gate never disappears because of a
 bad edit. `audit.format: "v1"` falls back to the old single-file log.
 
+`destructive.workspaceQuiet` (off by default) turns the routine cleanup of one temp file into a silent
+allow: the shell call has exactly one statement and one target, no `-Recurse`, no wildcard, and an
+absolute path under one of `roots` and under one of `paths`. `-Force` is allowed when those hold. Anything
+else still asks; R1, R3 and the critical tier are untouched. If a session cwd is known and lies outside
+`roots`, quiet disables itself and writes one `config-invalid` record; when no cwd is known that
+cross-check is skipped and the configured absolute roots decide on their own.
+
 ## Audit
 
 Every gated call becomes a short chain of records sharing one `id`: `requested` at the gate, `delivered`
 when the approval service accepts the question, `outcome` when the user or the guard decides, and
-`executed` when an approved call really ran. Records are linked by `prevHash`, so an edited or truncated
-line is detectable; the full command text is stored under `payload/` (secrets keep only their hash).
+`executed` when an approved call really ran. P1.7 silent allows write `allowed` instead. Records are
+linked by `prevHash`, so an edited or truncated line is detectable; the full command text is stored under
+`payload/` (secrets keep only their hash). `cwd` and `cwdSource` (`session` / `tool` / `null`) record the
+working directory the decision was made in; misconfiguration writes `config-invalid`.
 
 Read it offline:
 
@@ -143,7 +163,7 @@ them locally, then encrypts the result with Windows DPAPI (bound to the current 
 No build step, no runtime dependencies. Tests run directly:
 
 ```powershell
-npm test   # runs the seven test files in order
+npm test   # runs the eight test files in order
 ```
 
 Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the child processes that runner spawns.

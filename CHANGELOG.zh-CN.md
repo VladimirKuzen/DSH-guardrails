@@ -4,6 +4,16 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
+## [1.4.0] - 2026-11-15
+
+- 可选的工作区静默（`rules.destructive.workspaceQuiet`，默认关闭）：shell 调用只删除或移动一个目标、
+  不带 `-Recurse`、不含通配符、路径是绝对路径且位于 `roots` 之一与 `paths` 之一的下层时，不再弹卡。
+  满足上述条件时 `-Force` 也允许。R1、R3 与 critical 层完全不受影响，其余形状照常弹卡。
+- 静默放行写成 `allowed` 事件（带 `quiet: "workspace"` 与 payload），所以审计仍然回答得了
+  “哪些操作没问就放行了”；v1 模式下也会记 `decision: "allowed"`。
+- 若会话 cwd 已知且不在 `roots` 下，quiet 整体关闭并写一条 `config-invalid` 记录；拿不到 cwd 时
+  跳过这层交叉验证，只按配置的绝对 `roots` 判断。
+
 ## [1.3.2] - 2026-11-15
 
 - 审计记录新增 `cwd` 与 `cwdSource`（`session`、`tool` 或 `null`）：会话有工作目录时记会话目录，

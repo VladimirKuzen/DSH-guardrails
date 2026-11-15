@@ -1,6 +1,6 @@
 {
   "name": "@vlad/dsh-guardrails",
-  "version": "1.3.2",
+  "version": "1.4.0",
   "private": true,
   "description": "Blocks risky DSH tool calls before they run: protects DSH's own home, stops destructive shell commands, and flags secrets in tool arguments. Windows only.",
   "license": "MIT",
@@ -34,7 +34,7 @@
     "icon.svg"
   ],
   "scripts": {
-    "test": "node test/rules.test.mjs && node test/facts.test.mjs && node test/describe.test.mjs && node test/replay.test.mjs && node test/critical.test.mjs && node test/audit.test.mjs && node test/plugin.smoke.mjs"
+    "test": "node test/rules.test.mjs && node test/facts.test.mjs && node test/describe.test.mjs && node test/replay.test.mjs && node test/critical.test.mjs && node test/audit.test.mjs && node test/quiet.test.mjs && node test/plugin.smoke.mjs"
   },
   "dsh": {
     "bundle": {

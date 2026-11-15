@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync } from 'node:fs';
+import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync, mkdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -226,6 +226,52 @@ test('a workdir on a non-shell tool is not treated as cwd', async () => {
   const record = auditLines().find((r) => r.callId === 'c8');
   assert.equal(record.cwd, null);
   assert.equal(record.cwdSource, null);
+});
+
+test('workspace quiet allows a temp delete and logs an allowed event', async () => {
+  const work = join(dir, 'work');
+  const scratch = join(work, '_scratch');
+  mkdirSync(scratch, { recursive: true });
+  const victim = join(scratch, 'quiet-me.txt');
+  writeFileSync(victim, 'x', 'utf8');
+  writePolicy({
+    enabled: true,
+    auditDir: join(dir, 'audit'),
+    rules: {
+      destructive: {
+        mode: 'ask',
+        workspaceQuiet: { enabled: true, roots: [work], paths: ['_scratch'], alwaysAsk: ['.git'] },
+      },
+    },
+  });
+  const ctx = fakeCtx();
+
+  const decision = await ctx.pre(call('pwsh', { command: `Remove-Item '${victim}' -Force` }, 'q1'), next);
+  assert.deepEqual(decision, { kind: 'allow' });
+
+  const record = auditLines().find((r) => r.callId === 'q1');
+  assert.equal(record.event, 'allowed');
+  assert.equal(record.rule, 'R2');
+  assert.equal(record.mode, 'allow');
+  assert.equal(record.quiet, 'workspace');
+});
+
+test('workspace quiet still asks for a recursive delete', async () => {
+  const work = join(dir, 'work');
+  writePolicy({
+    enabled: true,
+    auditDir: join(dir, 'audit'),
+    rules: {
+      destructive: {
+        mode: 'ask',
+        workspaceQuiet: { enabled: true, roots: [work], paths: ['_scratch'], alwaysAsk: ['.git'] },
+      },
+    },
+  });
+  const ctx = fakeCtx();
+
+  const decision = await ctx.pre(call('pwsh', { command: `Remove-Item '${join(work, '_scratch')}' -Recurse -Force` }, 'q2'), next);
+  assert.equal(decision.kind, 'ask');
 });
 
 test('audit.format "v1" keeps the old single-file format', async () => {

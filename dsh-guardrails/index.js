@@ -35,6 +35,7 @@ import { join } from 'node:path';
 
 import { criticalFallback, evaluate } from './rules.js';
 import { SHELL_TOOLS } from './lib/rules/kit.js';
+import { decideQuiet } from './lib/rules/quiet.js';
 import { collectFacts } from './lib/facts.js';
 import { describe } from './lib/describe.js';
 import { AuditLog, escapeControl, truncateCodePoints } from './lib/audit/v2.js';
@@ -217,6 +218,8 @@ export function apply(ctx, config = {}) {
   // callId -> pending operation, so approval/asked can be matched back to the gate.
   const pending = new Map();
   const byApproval = new Map();
+  /** Reasons already reported as config-invalid; one warning per process. */
+  const quietWarned = new Set();
 
   const forget = (entry) => {
     pending.delete(entry.callId);
@@ -335,7 +338,60 @@ export function apply(ctx, config = {}) {
       displayReason = undefined;
     }
 
+    // P1.7 workspace quiet: only turns an ordinary "clean up a temp file" ask
+    // into an allow. R1, R3, critical and every other R2 hit are untouched.
+    if (verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined) {
+      const quietConfig = policy.rules?.destructive?.workspaceQuiet;
+      const decision = decideQuiet({
+        tool: exec?.name,
+        command: exec?.arguments?.command,
+        facts,
+        config: quietConfig,
+        cwd: resolveCwd(exec).cwd,
+      });
+      if (decision.quiet) {
+        verdict = { ...verdict, mode: 'allow', quiet: 'workspace' };
+      } else if (decision.reason === 'config-invalid' || decision.reason === 'cwd-mismatch') {
+        // Misconfiguration disables quiet globally; report it once per process.
+        if (!quietWarned.has(decision.reason) && usesV2()) {
+          quietWarned.add(decision.reason);
+          try {
+            auditLog().append({
+              id: randomUUID(),
+              event: 'config-invalid',
+              ts: new Date().toISOString(),
+              tool: exec?.name ?? null,
+              reason: decision.reason,
+            });
+          } catch {
+            // A failed audit write must not break the tool chain
+          }
+        }
+      }
+    }
+
     const fields = fieldsFor(exec, verdict, facts, displayReason);
+
+    if (verdict.mode === 'allow') {
+      if (usesV2()) {
+        emit({ id: randomUUID(), event: 'allowed', ...fields, quiet: verdict.quiet ?? null, ...payloadOf(exec, verdict) });
+      } else {
+        try {
+          auditV1(auditDir(), {
+            ts: new Date().toISOString(),
+            rule: verdict.rule,
+            mode: verdict.mode,
+            tool: exec?.name ?? '?',
+            decision: 'allowed',
+            quiet: verdict.quiet,
+            target: summarize(exec),
+          });
+        } catch {
+          // A failed audit write must not change the verdict
+        }
+      }
+      return next();
+    }
 
     if (usesV2()) {
       if (verdict.mode === 'deny') {
