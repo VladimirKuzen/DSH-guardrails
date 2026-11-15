@@ -136,6 +136,31 @@ test('describe: a registry delete keeps the irreversibility warning', () => {
   assert.equal(text.zh, '⚠ 删除注册表键｜目标 HKCU\\Software\\X｜不可恢复');
 });
 
+test('describe: a registry import says the script contents are invisible', () => {
+  const text = describe({ rule: 'R2', mode: 'ask' }, {
+    kind: 'registry',
+    registryAction: 'import',
+    target: 'C:\\work\\p16.reg',
+    reversible: 'unknown',
+    protectedHit: false,
+  });
+  assert.equal(text.zh, '⚠ 修改注册表｜目标 C:\\work\\p16.reg｜脚本内容不可见｜恢复方式待评估');
+  assert.ok(text.en.includes('script contents not visible'));
+});
+
+test('describe: a wildcard target advertises an unknown scope', () => {
+  const text = describe({ rule: 'R2', mode: 'ask' }, {
+    kind: 'registry',
+    registryAction: 'delete',
+    target: 'HKCU:\\Software\\DeepSeekP16*',
+    wildcard: true,
+    reversible: 'no',
+    protectedHit: false,
+  });
+  assert.equal(text.zh, '⚠ 删除注册表键｜目标 HKCU:\\Software\\DeepSeekP16*｜含通配符，影响范围未知｜不可恢复');
+  assert.ok(text.en.includes('wildcard target, scope unknown'));
+});
+
 test('describe: a critical verdict uses the block prefix and its category', () => {
   const disk = describe({ rule: 'R2', severity: 'critical', mode: 'deny', category: 'disk' }, {
     kind: 'unknown',

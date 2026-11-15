@@ -189,6 +189,27 @@ test('facts: a PowerShell provider write is a registry add', () => {
   assert.equal(facts.target, 'HKCU:\\Software\\X');
 });
 
+test('facts: reg import shows the file and stays out of the wildcard path', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'reg import C:\\work\\p16.reg' },
+  });
+  assert.equal(facts.kind, 'registry');
+  assert.equal(facts.registryAction, 'import');
+  assert.equal(facts.target, 'C:\\work\\p16.reg');
+  assert.equal(facts.wildcard, undefined);
+});
+
+test('facts: a wildcard provider path is flagged as a pattern', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'Remove-Item -Path HKCU:\\Software\\DeepSeekP16* -Recurse -Force' },
+  });
+  assert.equal(facts.kind, 'registry');
+  assert.equal(facts.registryAction, 'delete');
+  assert.equal(facts.wildcard, true);
+});
+
 test('facts: R1 shell reports the protected path, not the -Path flag', () => {
   const facts = factsOf({
     name: 'pwsh',

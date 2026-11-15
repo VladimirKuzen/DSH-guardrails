@@ -11,7 +11,7 @@ and leaves a local audit trail of what was gated.
 - **Auditable**: every gated call writes one JSONL line; secrets are never written in clear text.
 - **Windows-only**, pre-1.0. Path semantics assume Windows (`~`, `%VAR%`, `$env:VAR`, backslashes).
 
-**Status**: v1.2.1. The P1.6 critical tier was verified live on Windows 11 (2026-11-15): denied calls
+**Status**: v1.2.2. The P1.6 critical tier was verified live on Windows 11 (2026-11-15): denied calls
 return no card and never execute, read-only diagnostics still run, and ordinary R2 asks are unchanged.
 See [docs/p1.6-windows-critical.md](docs/p1.6-windows-critical.md) §11 for the probe log.
 

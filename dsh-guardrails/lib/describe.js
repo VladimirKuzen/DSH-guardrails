@@ -19,6 +19,9 @@ export const LOCALES = Object.freeze({
 
 const SEPARATOR = { zh: '｜', en: ' · ' };
 
+/** Import/load/restore act through a file, so the keys they touch are invisible. */
+const REGISTRY_SCRIPT = new Set(['import', 'load', 'restore']);
+
 function fill(template, vars) {
   return template.replace(/\{(\w+)\}/g, (_, key) => (vars[key] === undefined ? '' : String(vars[key])));
 }
@@ -81,6 +84,8 @@ export function describe(verdict, facts, options = {}) {
 
     body.push(text(pack, actionKey(facts, verdict)));
     if (facts.target !== '') body.push(text(pack, 'seg.target', { path: clipPath(facts.target) }));
+    if (facts.kind === 'registry' && REGISTRY_SCRIPT.has(facts.registryAction)) body.push(text(pack, 'seg.registry.script'));
+    if (facts.wildcard === true) body.push(text(pack, 'seg.wildcard'));
     if (facts.kind === 'overwrite') body.push(text(pack, 'seg.existed'));
     if (facts.count === 1) body.push(text(pack, 'seg.count.one'));
     else if (facts.count !== undefined) body.push(text(pack, 'seg.count', { count: facts.count }));

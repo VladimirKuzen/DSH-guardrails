@@ -31,6 +31,8 @@
   "seg.reversible.no": "不可恢复",
   "seg.reversible.yes": "可恢复",
   "seg.reversible.unknown": "恢复方式待评估",
+  "seg.registry.script": "脚本内容不可见",
+  "seg.wildcard": "含通配符，影响范围未知",
   "seg.protected": "受保护目录",
   "seg.lines": "命令 {count} 行",
   "seg.secret.wrap": "（{label}）",

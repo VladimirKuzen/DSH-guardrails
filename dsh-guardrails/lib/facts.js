@@ -267,6 +267,8 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
 
   const shown = displayPath(rawTarget, env);
   const target = isUnresolved(shown) ? '' : shown;
+  // A wildcard means the text names a pattern, not one key or file.
+  const wildcard = /[*?]/.test(rawTarget) ? true : undefined;
   const lineCount = shell ? command.split(/\r?\n/).filter((line) => line.trim() !== '').length : 0;
 
   const stat = target === '' ? undefined : safeStat(io, target);
@@ -301,6 +303,7 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
     lines: lineCount,
     reversible,
     registryAction,
+    wildcard,
     protectedHit: protectedTarget !== '' ? true : underRoots(expandPath(rawTarget, env), roots),
     secretLabel: verdict?.rule === 'R3' ? str(verdict.label) : '',
     severity: criticalCategory === '' ? undefined : 'critical',

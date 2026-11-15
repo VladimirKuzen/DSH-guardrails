@@ -31,6 +31,8 @@
   "seg.reversible.no": "irreversible",
   "seg.reversible.yes": "reversible",
   "seg.reversible.unknown": "recovery method not assessed",
+  "seg.registry.script": "script contents not visible",
+  "seg.wildcard": "wildcard target, scope unknown",
   "seg.protected": "protected directory",
   "seg.lines": "{count} command lines",
   "seg.secret.wrap": " ({label})",
