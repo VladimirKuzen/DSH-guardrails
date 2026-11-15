@@ -1,5 +1,7 @@
 # Changelog
 
+**English** | [中文](CHANGELOG.zh-CN.md)
+
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
 ## [Unreleased]

@@ -106,7 +106,7 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 | `dsh-guardrails/` | 插件本体：`index.js`（宿主接线）、`rules.js`（纯判定逻辑） |
 | `dsh-guardrails/test/` | 规则测试与打包冒烟测试 |
 | `design/` | 设计文档与边界记录——P1.6 系统级硬停及其已知限制 |
-| `CHANGELOG.md` | 版本历史 |
+| `CHANGELOG.md` | 版本历史（英文与中文两份） |
 | `scripts/` | 维护者工具：审计脱敏、快照/恢复、健康检查。**只留本地（已 gitignore），不属于本仓库** |
 
 之所以有这套工具，是因为审计文件里含命令原文和路径。它在本地做快照与脱敏，再用 Windows DPAPI

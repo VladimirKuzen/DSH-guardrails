@@ -113,7 +113,7 @@ bad edit.
 | `dsh-guardrails/` | The plugin: `index.js` (host wiring), `rules.js` (pure decision logic) |
 | `dsh-guardrails/test/` | Rule tests and package smoke test |
 | `design/` | Design notes and boundary records — the P1.6 critical tier and its known limits |
-| `CHANGELOG.md` | Release history |
+| `CHANGELOG.md` | Release history — English and Chinese versions |
 | `scripts/` | Maintainer tooling — audit redaction, snapshot/restore, health check. **Kept local (git-ignored), not part of this repository** |
 
 Maintainer tooling exists because audit files contain command text and paths. It snapshots and redacts
