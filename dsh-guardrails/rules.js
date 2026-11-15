@@ -23,16 +23,15 @@ import {
   DEFAULT_SECRETS,
   PATH_TOOLS,
   SHELL_TOOLS,
-  allStrings,
   criticalReason,
   expandPath,
   findCritical,
   isUnder,
-  labelFor,
   mentionsHomeNearWrite,
   pathOf,
   str,
 } from './lib/rules/kit.js';
+import { evaluateR3 } from './lib/rules/r3-secrets.js';
 
 // Kept as part of this module's public surface: tests and policy examples import them.
 export { DEFAULT_DESTRUCTIVE, DEFAULT_SECRETS, expandPath };
@@ -71,40 +70,10 @@ export function evaluate(policy, call, env) {
   const rules = policy.rules ?? {};
   const name = str(call?.name);
   const args = call?.arguments ?? call?.args ?? {};
-  const strings = allStrings(args);
 
   // ---- R3 secrets (most severe, evaluated first)
-  const secretRule = rules.secrets ?? {};
-  if (secretRule.mode !== 'off') {
-    const patterns = [...DEFAULT_SECRETS, ...(secretRule.patterns ?? [])];
-    for (const source of patterns) {
-      let re;
-      try {
-        re = new RegExp(source, 'i');
-      } catch {
-        continue;
-      }
-      for (const text of strings) {
-        const hit = re.exec(text);
-        if (hit) {
-          const label = labelFor(hit[0]);
-          // The host echoes a shell command verbatim in its approval card, so
-          // asking about one would display the secret. Refuse it instead; a
-          // file write has no such echo and may still be approved.
-          const inShellCommand = SHELL_TOOLS.has(name);
-          const mode = secretRule.mode === 'deny' || inShellCommand ? 'deny' : 'ask';
-          return {
-            rule: 'R3',
-            mode,
-            label,
-            reason: mode === 'deny'
-              ? `Guardrails R3: a secret (${label}) appears in a shell command, which was refused instead of shown. Do not put secrets in commands; write them to ~/.dsh/secrets/api-keys.json or an environment variable.`
-              : `Guardrails R3: tool "${name}" appears to carry a secret (${label}); secrets must live in config files or environment variables, not in tool arguments or conversation.`,
-          };
-        }
-      }
-    }
-  }
+  const secret = evaluateR3(call, rules.secrets ?? {});
+  if (secret !== null) return secret;
 
   // ---- R1 DSH's own home
   const homeRule = rules.protectDshHome ?? {};
