@@ -40,6 +40,11 @@ const CRITICAL_ACTION = {
 
 function actionKey(facts, verdict) {
   if (verdict?.severity === 'critical') return CRITICAL_ACTION[facts.criticalCategory] ?? 'action.critical';
+  if (facts.kind === 'registry') {
+    if (facts.registryAction === 'add') return 'action.registry.add';
+    if (facts.registryAction === 'delete') return 'action.registry.delete';
+    return 'action.registry';
+  }
   if (facts.kind === 'delete' && facts.recursive === true) return 'action.delete.recursive';
   if (facts.kind === 'create-dir') return 'action.create.dir';
   return `action.${facts.kind}`;
@@ -82,6 +87,8 @@ export function describe(verdict, facts, options = {}) {
     if (facts.protectedHit === true && facts.kind !== 'protected') body.push(text(pack, 'seg.protected'));
     if (facts.reversible === 'no') body.push(text(pack, 'seg.reversible.no'));
     else if (facts.reversible === 'yes') body.push(text(pack, 'seg.reversible.yes'));
+    // Registry adds overwrite values we cannot see; say so instead of guessing.
+    else if (facts.reversible === 'unknown' && facts.kind === 'registry') body.push(text(pack, 'seg.reversible.unknown'));
     if (typeof facts.lines === 'number' && facts.lines > 3) body.push(text(pack, 'seg.lines', { count: facts.lines }));
 
     rendered[locale] = `${prefix} ${body.join(SEPARATOR[locale] ?? ' ')}`.trim();

@@ -143,6 +143,52 @@ test('facts: New-Item -ItemType Directory reports a directory', () => {
   assert.equal(facts.target, 'C:\\work\\d');
 });
 
+test('commandTarget: a registry key is the target, not its /v switch', () => {
+  assert.equal(
+    commandTarget('reg add HKCU\\Software\\DeepSeekP16Probe /v Probe /t REG_SZ /d ok /f'),
+    'HKCU\\Software\\DeepSeekP16Probe',
+  );
+  assert.equal(commandTarget('/v'), '');
+});
+
+test('commandTarget: unix paths are only recognized for bash', () => {
+  assert.equal(commandTarget('/etc/passwd'), '');
+  assert.equal(commandTarget('/etc/passwd', { unix: true }), '/etc/passwd');
+  assert.equal(commandTarget('rm -rf /etc/x', { unix: true }), '/etc/x');
+});
+
+test('facts: reg add names its key and cannot prove reversibility', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'reg add HKCU\\Software\\DeepSeekP16Probe /v Probe /t REG_SZ /d ok /f' },
+  });
+  assert.equal(facts.kind, 'registry');
+  assert.equal(facts.registryAction, 'add');
+  assert.equal(facts.target, 'HKCU\\Software\\DeepSeekP16Probe');
+  assert.equal(facts.reversible, 'unknown');
+});
+
+test('facts: reg delete is irreversible', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'reg delete HKCU\\Software\\DeepSeekP16Probe /f' },
+  });
+  assert.equal(facts.kind, 'registry');
+  assert.equal(facts.registryAction, 'delete');
+  assert.equal(facts.target, 'HKCU\\Software\\DeepSeekP16Probe');
+  assert.equal(facts.reversible, 'no');
+});
+
+test('facts: a PowerShell provider write is a registry add', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'Set-ItemProperty -Path HKCU:\\Software\\X -Name Y -Value 1' },
+  });
+  assert.equal(facts.kind, 'registry');
+  assert.equal(facts.registryAction, 'add');
+  assert.equal(facts.target, 'HKCU:\\Software\\X');
+});
+
 test('facts: R1 shell reports the protected path, not the -Path flag', () => {
   const facts = factsOf({
     name: 'pwsh',

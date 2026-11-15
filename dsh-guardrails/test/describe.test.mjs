@@ -111,6 +111,31 @@ test('locales: both packs define identical keys and placeholders', () => {
   }
 });
 
+test('describe: a registry add names the key and does not claim irreversibility', () => {
+  const facts = {
+    kind: 'registry',
+    registryAction: 'add',
+    target: 'HKCU\\Software\\DeepSeekP16Probe',
+    reversible: 'unknown',
+    protectedHit: false,
+  };
+  const text = describe({ rule: 'R2', mode: 'ask' }, facts);
+  assert.equal(text.zh, '⚠ 新增注册表键或值｜目标 HKCU\\Software\\DeepSeekP16Probe｜恢复方式待评估');
+  assert.equal(text.en, '⚠ Add a registry key or value · at HKCU\\Software\\DeepSeekP16Probe · recovery method not assessed');
+  assert.ok(!text.zh.includes('不可恢复'));
+});
+
+test('describe: a registry delete keeps the irreversibility warning', () => {
+  const text = describe({ rule: 'R2', mode: 'ask' }, {
+    kind: 'registry',
+    registryAction: 'delete',
+    target: 'HKCU\\Software\\X',
+    reversible: 'no',
+    protectedHit: false,
+  });
+  assert.equal(text.zh, '⚠ 删除注册表键｜目标 HKCU\\Software\\X｜不可恢复');
+});
+
 test('describe: a critical verdict uses the block prefix and its category', () => {
   const disk = describe({ rule: 'R2', severity: 'critical', mode: 'deny', category: 'disk' }, {
     kind: 'unknown',

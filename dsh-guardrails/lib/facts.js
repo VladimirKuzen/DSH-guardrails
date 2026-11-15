@@ -33,7 +33,12 @@ const KIND_PATTERNS = [
 /** A path flag, but not the "-Path" inside "Join-Path" or "Split-Path". */
 const PATH_FLAG = /(?<![\w-])-(?:literal)?path\b\s+(?:"([^"]+)"|'([^']+)'|([^\s]+))/i;
 const QUOTED = /"([^"]+)"|'([^']+)'/g;
-const LOOKS_LIKE_PATH = /^(?:[a-z]:[\\/]|\\\\|\/|\.{1,2}[\\/])/i;
+/** A Windows path: drive-rooted or UNC. A bare "/v" is a CLI switch, not a path. */
+const LOOKS_LIKE_WINDOWS = /^(?:[a-z]:[\\/]|\\\\)/i;
+/** Unix-style paths only make sense for the bash tool. */
+const LOOKS_LIKE_ANY = /^(?:[a-z]:[\\/]|\\\\|\/|\.{1,2}[\\/])/i;
+/** A registry key, e.g. HKCU\Software\Foo or HKLM:\SYSTEM (either provider syntax). */
+const REG_KEY = /\bhk(?:lm|cu|cr|u|cc)[:\\][^\s"';|&]+/i;
 const RECURSIVE = /(?:-recurse|\/mir\b|\/s\b)/i;
 const DIRECTORY_ITEM = /-itemtype\s+directory\b/i;
 
@@ -102,22 +107,45 @@ export function pathArgument(args) {
   return '';
 }
 
+/** First registry key mentioned by a command, if any. */
+export function registryKey(command) {
+  const match = REG_KEY.exec(str(command));
+  return match === null ? '' : match[0];
+}
+
+/** The registry sub-action behind a registry-kind statement: add / delete / import / load / restore. */
+export function registryVerb(statement) {
+  const text = str(statement);
+  const direct = /\breg(?:\.exe)?\s+(add|delete|import|load|restore)\b/i.exec(text);
+  if (direct !== null) return direct[1].toLowerCase();
+  if (!/\bhk(?:lm|cu|cr|u|cc):/i.test(text)) return '';
+  if (/\b(?:set|new|add)-itemproperty\b|\bnew-item\b/i.test(text)) return 'add';
+  if (/\b(?:remove-item|remove-itemproperty|clear-item)\b/i.test(text)) return 'delete';
+  return '';
+}
+
 /** Best-effort target extraction from one statement or command line. */
-export function commandTarget(command) {
+export function commandTarget(command, options = {}) {
   const text = str(command);
   if (text === '') return '';
+
+  // `reg add HKCU\…` has no path-like token at all: the key is the target.
+  const key = registryKey(text);
+  if (key !== '') return key;
 
   const flag = PATH_FLAG.exec(text);
   if (flag !== null) return flag[1] ?? flag[2] ?? flag[3] ?? '';
 
+  const pathLike = options.unix === true ? LOOKS_LIKE_ANY : LOOKS_LIKE_WINDOWS;
+
   for (const match of text.matchAll(QUOTED)) {
     const quoted = match[1] ?? match[2] ?? '';
-    if (LOOKS_LIKE_PATH.test(quoted)) return quoted;
+    if (pathLike.test(quoted)) return quoted;
   }
 
   for (const token of text.split(/\s+/)) {
     const bare = token.replace(/^["']|["']$/g, '');
-    if (LOOKS_LIKE_PATH.test(bare)) return bare;
+    if (pathLike.test(bare)) return bare;
   }
   return '';
 }
@@ -222,6 +250,9 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
   const protectedTarget = shell && verdict?.rule === 'R1' ? protectedPath(command, env) : '';
   if (protectedTarget !== '') kind = 'protected';
 
+  // Registry writes split into add / delete / import: only deletion is really irreversible.
+  const registryAction = kind === 'registry' ? registryVerb(action.statement) : '';
+
   // A critical verdict knows its own target (the system path it matched).
   const criticalCategory = verdict?.severity === 'critical' ? str(verdict.category) : '';
   const criticalTarget = criticalCategory === '' ? '' : str(verdict.target);
@@ -232,7 +263,7 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
       ? protectedTarget
       : PATH_TOOLS.has(name)
         ? pathArgument(args)
-        : commandTarget(action.statement);
+        : commandTarget(action.statement, { unix: name === 'bash' });
 
   const shown = displayPath(rawTarget, env);
   const target = isUnresolved(shown) ? '' : shown;
@@ -244,7 +275,13 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
 
   const recursive = RECURSIVE.test(command) ? true : undefined;
   const resolvedKind = kind === 'write' ? (exists === true ? 'overwrite' : 'create') : kind;
-  const reversible = criticalCategory === '' ? (REVERSIBLE[resolvedKind] ?? 'unknown') : 'no';
+  const reversible = criticalCategory !== ''
+    ? 'no'
+    : kind === 'registry'
+      // Adding a key/value can be undone; overwriting an existing value cannot be
+      // proven from text, so it stays "not assessed" instead of a wrong "no".
+      ? (registryAction === 'delete' ? 'no' : 'unknown')
+      : (REVERSIBLE[resolvedKind] ?? 'unknown');
 
   let count;
   if (exists === true) {
@@ -263,6 +300,7 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
     recursive,
     lines: lineCount,
     reversible,
+    registryAction,
     protectedHit: protectedTarget !== '' ? true : underRoots(expandPath(rawTarget, env), roots),
     secretLabel: verdict?.rule === 'R3' ? str(verdict.label) : '',
     severity: criticalCategory === '' ? undefined : 'critical',
