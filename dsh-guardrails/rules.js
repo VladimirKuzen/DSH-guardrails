@@ -21,16 +21,13 @@ import { readOnlyDiagnostic } from './lib/critical.js';
 import {
   DEFAULT_DESTRUCTIVE,
   DEFAULT_SECRETS,
-  PATH_TOOLS,
   SHELL_TOOLS,
   criticalReason,
   expandPath,
   findCritical,
-  isUnder,
-  mentionsHomeNearWrite,
-  pathOf,
   str,
 } from './lib/rules/kit.js';
+import { evaluateR1 } from './lib/rules/r1-home.js';
 import { evaluateR3 } from './lib/rules/r3-secrets.js';
 
 // Kept as part of this module's public surface: tests and policy examples import them.
@@ -76,42 +73,8 @@ export function evaluate(policy, call, env) {
   if (secret !== null) return secret;
 
   // ---- R1 DSH's own home
-  const homeRule = rules.protectDshHome ?? {};
-  if (homeRule.mode !== 'off') {
-    const roots = (homeRule.roots ?? ['~/.dsh', '~/.agents']).map((root) => expandPath(root, env)).filter(Boolean);
-    const alwaysAsk = new Set(homeRule.alwaysAskTools ?? ['plugin_manager']);
-    const mode = homeRule.mode === 'deny' ? 'deny' : 'ask';
-
-    if (alwaysAsk.has(name)) {
-      return {
-        rule: 'R1',
-        mode,
-        reason: `Guardrails R1: tool "${name}" changes DSH's own profile/plugins under the protected home; it requires explicit approval.`,
-      };
-    }
-
-    if (PATH_TOOLS.has(name)) {
-      const target = expandPath(pathOf(args), env);
-      if (isUnder(target, roots)) {
-        return {
-          rule: 'R1',
-          mode,
-          reason: `Guardrails R1: tool "${name}" writes inside DSH's protected home (${target}).`,
-        };
-      }
-    }
-
-    if (SHELL_TOOLS.has(name)) {
-      const command = str(args.command ?? args.cmd ?? args.script);
-      if (mentionsHomeNearWrite(command)) {
-        return {
-          rule: 'R1',
-          mode,
-          reason: `Guardrails R1: shell command both references DSH's protected home and writes/moves/deletes files.`,
-        };
-      }
-    }
-  }
+  const home = evaluateR1(call, rules.protectDshHome ?? {}, env);
+  if (home !== null) return home;
 
   // ---- R2c critical hard stop (read-only diagnostics pass before destructive matching)
   const criticalRule = rules.critical ?? {};
