@@ -256,6 +256,29 @@ test('自定义模式可追加', () => {
   assert.equal(evaluate(custom, call('pwsh', { command: 'psql -c "drop table users"' }), env).rule, 'R2');
 });
 
+test('precedence: R3 runs before R1 and the critical tier', () => {
+  // One command touches all three: a secret, the DSH home and a system hive.
+  const command = 'Set-Content "$env:USERPROFILE\\.dsh\\AGENTS.md" -Value "sk-abcdefghijklmnopqrstuvwxyz"; reg delete HKLM\\SYSTEM\\Foo /f';
+  const verdict = evaluate(policy, call('pwsh', { command }), env);
+  assert.equal(verdict?.rule, 'R3');
+  assert.equal(verdict.mode, 'deny');
+});
+
+test('precedence: R1 runs before the critical tier', () => {
+  const command = 'Set-Content "$env:USERPROFILE\\.dsh\\AGENTS.md" -Value "x"; reg delete HKLM\\SYSTEM\\Foo /f';
+  const verdict = evaluate(policy, call('pwsh', { command }), env);
+  assert.equal(verdict?.rule, 'R1');
+  assert.equal(verdict.mode, 'ask');
+});
+
+test('precedence: the critical tier runs before plain destructive patterns', () => {
+  // "reg delete" also matches the ordinary R2 list; the critical verdict must win.
+  const verdict = evaluate(policy, call('pwsh', { command: 'reg delete HKLM\\SYSTEM\\Foo /f' }), env);
+  assert.equal(verdict?.rule, 'R2');
+  assert.equal(verdict.severity, 'critical');
+  assert.equal(verdict.mode, 'deny');
+});
+
 test('内置密钥正则本身不会自我命中', () => {
   // 把默认模式当成普通文本写进文件，不应触发 R3
   const text = DEFAULT_SECRETS.join('\n');

@@ -11,6 +11,12 @@
 - 增加 MIT 许可证。
 - 文件头中英双语；内联注释只用英文。
 
+## [1.2.3] - 2026-11-15
+
+- 规则拆分为 `dsh-guardrails/lib/rules/` 下的模块（`kit.js`、`r1-home.js`、`r2-destructive.js`、`r3-secrets.js`）；
+  `rules.js` 只保留有序调度与 critical 兜底。行为不变。
+- 新增顺序测试，锁定 R3 → R1 → R2 critical → R2 破坏性操作的判定顺序。
+
 ## [1.2.2] - 2026-11-15
 
 - 目标只能看到一部分时，卡片给出提示：`reg import` / `load` / `restore` 只显示脚本文件、内容不可见；注册表通配符路径提示影响范围未知。

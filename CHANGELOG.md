@@ -13,6 +13,12 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 - MIT license added.
 - Bilingual file headers; inline comments are English only.
 
+## [1.2.3] - 2026-11-15
+
+- Rules split into modules under `dsh-guardrails/lib/rules/` (`kit.js`, `r1-home.js`, `r2-destructive.js`,
+  `r3-secrets.js`); `rules.js` keeps only the ordered dispatcher and the critical fallback. No behavior change.
+- Precedence tests lock the order: R3 → R1 → R2 critical → R2 destructive.
+
 ## [1.2.2] - 2026-11-15
 
 - Card warnings when the target is only partly visible: `reg import` / `load` / `restore` name the script
