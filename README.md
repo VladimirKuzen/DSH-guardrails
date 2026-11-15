@@ -13,7 +13,7 @@ and leaves a local audit trail of what was gated.
 
 **Status**: v1.2.2. The P1.6 critical tier was verified live on Windows 11 (2026-11-15): denied calls
 return no card and never execute, read-only diagnostics still run, and ordinary R2 asks are unchanged.
-See [docs/p1.6-windows-critical.md](docs/p1.6-windows-critical.md) §11 for the probe log.
+See [design/p1.6-windows-critical.md](design/p1.6-windows-critical.md) §11 for the probe log.
 
 ## Why
 
@@ -112,7 +112,8 @@ bad edit.
 |---|---|
 | `dsh-guardrails/` | The plugin: `index.js` (host wiring), `rules.js` (pure decision logic) |
 | `dsh-guardrails/test/` | Rule tests and package smoke test |
-| `docs/` | Design and implementation plan |
+| `design/` | Design notes and boundary records — the P1.6 critical tier and its known limits |
+| `CHANGELOG.md` | Release history |
 | `scripts/` | Maintainer tooling — audit redaction, snapshot/restore, health check. **Kept local (git-ignored), not part of this repository** |
 
 Maintainer tooling exists because audit files contain command text and paths. It snapshots and redacts

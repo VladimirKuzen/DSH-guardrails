@@ -1,6 +1,7 @@
 # Backups and scratch files
 _backup/
 _scratch/
+_acl-reports/
 *.bak
 *.tmp
 
