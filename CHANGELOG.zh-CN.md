@@ -4,6 +4,12 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
+## [1.3.1] - 2026-11-15
+
+- 修复哈希链：`canonicalJson` 现在与 `JSON.stringify` 对 undefined 的处理一致。`facts` 里 `severity` 为空时，
+  记录写盘再读回不再导致校验失败。第一次 live 运行暴露了这个问题——1.3.0 写下的记录 `--verify` 会失败，应轮换。
+- 新增回归测试：带 undefined 字段的记录经 JSON 往返后仍能通过校验。
+
 ## [1.3.0] - 2026-11-15
 
 - 审计改为事件流（`audit/v2/`）：闸门处写 `requested`，审批服务接手时写 `delivered`，用户或护栏作出决定时写

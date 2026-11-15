@@ -22,11 +22,17 @@ import { join } from 'node:path';
 
 const GENESIS = 'genesis';
 
-/** Stable JSON: object keys sorted, no whitespace. Used for the hash input. */
+/**
+ * Stable JSON: object keys sorted, no whitespace. Mirrors `JSON.stringify`
+ * semantics for missing values, so a hash computed at write time still matches
+ * after the record went through `JSON.parse`.
+ */
 export function canonicalJson(value) {
+  if (value === undefined) return 'null';
   if (value === null || typeof value !== 'object') return JSON.stringify(value);
   if (Array.isArray(value)) return `[${value.map((item) => canonicalJson(item)).join(',')}]`;
-  const keys = Object.keys(value).sort();
+  // `JSON.stringify` drops keys whose value is undefined; keep the same shape.
+  const keys = Object.keys(value).filter((key) => value[key] !== undefined).sort();
   return `{${keys.map((key) => `${JSON.stringify(key)}:${canonicalJson(value[key])}`).join(',')}}`;
 }
 

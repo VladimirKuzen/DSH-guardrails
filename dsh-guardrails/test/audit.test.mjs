@@ -30,6 +30,14 @@ test('canonicalJson sorts keys and omits whitespace', () => {
   assert.equal(canonicalJson(null), 'null');
 });
 
+test('canonicalJson mirrors JSON.stringify for undefined values', () => {
+  // A record built with `facts: { severity: undefined }` is written by
+  // JSON.stringify without that key; the hash must be computed the same way.
+  assert.equal(canonicalJson({ a: undefined, b: 1 }), '{"b":1}');
+  assert.equal(canonicalJson({ nested: { x: undefined, y: 2 } }), '{"nested":{"y":2}}');
+  assert.equal(canonicalJson([undefined, 1]), '[null,1]');
+});
+
 test('truncateCodePoints never splits a multi-byte character', () => {
   const result = truncateCodePoints('😀😀😀中文', 3);
   assert.equal(result.text, '😀😀😀');
@@ -98,6 +106,24 @@ test('a half-written trailing line is repaired before the next append', () => {
   const lines = records(dir);
   assert.equal(lines.length, 2);
   assert.deepEqual(verifyChain(lines), { ok: true, index: 2 });
+});
+
+test('a record with undefined fields still verifies after a JSON round-trip', () => {
+  const dir = join(root, 'undefined-fields');
+  const log = new AuditLog({ dir, now });
+  log.append({
+    id: 'op-6',
+    event: 'requested',
+    rule: 'R2',
+    mode: 'ask',
+    facts: { kind: 'delete', severity: undefined, criticalCategory: '' },
+    payload: 'Remove-Item x',
+  });
+  // Re-parse exactly what is on disk: the undefined key is gone, and the hash
+  // must still match (this is the bug the first live run exposed).
+  const lines = records(dir);
+  assert.equal('severity' in lines[0].facts, false);
+  assert.deepEqual(verifyChain(lines), { ok: true, index: 1 });
 });
 
 test('verifyChain reports a tampered record', () => {

@@ -4,6 +4,13 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
+## [1.3.1] - 2026-11-15
+
+- Fix the hash chain: `canonicalJson` now mirrors `JSON.stringify` for undefined values, so a record whose
+  `facts` carried an empty `severity` no longer fails verification after it is read back from disk. The
+  first live run exposed this — records written by 1.3.0 fail `--verify` and should be rotated.
+- Regression test: a record with undefined fields still verifies after a JSON round-trip.
+
 ## [1.3.0] - 2026-11-15
 
 - Audit rewrites itself as an event stream (`audit/v2/`): `requested` at the gate, `delivered` when the

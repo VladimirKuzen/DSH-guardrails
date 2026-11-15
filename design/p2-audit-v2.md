@@ -13,6 +13,9 @@
 - 待 live 验证：根上下文能否收到 `session/event`（若收不到，改为 `ctx.on('session/event', fn, { global: true })`，
   已在代码注释里标明）。验证方法：重启后触发一次 R2 ask，用 `audit-report.mjs` 看是否出现 `delivered`。
 - 未做：1.4.0 的 `workspaceQuiet`（P1.7），按计划在第二批。
+- 1.3.1 修复：首次 live 运行（15:17Z 的删卡探针）四条事件都写对了，但 `--verify` 报哈希不符——
+  `canonicalJson` 与 `JSON.stringify` 对 `undefined` 的处理不一致，`facts.severity` 为空时写盘被丢弃、
+  哈希里却留下了。已统一语义并补回归测试；1.3.0 写下的记录需要轮换。
 
 ## 1. 要解决的问题
 
