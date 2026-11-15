@@ -38,7 +38,8 @@
 
 ## 装上之后
 
-- **审计**：`~/.dsh/guardrails/audit/audit-YYYY-MM-DD.jsonl`，每次被拦截的调用一行。
+- **审计**：`~/.dsh/guardrails/audit/v2/`——`requested` / `delivered` / `outcome` / `executed` 事件流，
+  带哈希链；命令原文在 `payload/`，密钥只留哈希。用 `node tools/audit-report.mjs --stats --verify` 读取。
 - **心跳**：`~/.dsh/guardrails/loaded.json`。判据是“修改时间新鲜 + 版本一致”，pid 不可信。
 - **不新增常驻进程**：它跑在 DSH 宿主进程里。
 

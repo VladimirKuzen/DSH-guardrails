@@ -79,13 +79,14 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 |---|---|
 | 策略 | `~/.dsh/guardrails/policy.json`——2 秒内重新读取，不用重启 |
 | 策略覆盖 | 环境变量 `DSH_GUARDRAILS_POLICY` |
-| 审计 | `~/.dsh/guardrails/audit/audit-YYYY-MM-DD.jsonl`（按本地日期） |
+| 审计 | `~/.dsh/guardrails/audit/v2/`——按日一个 JSONL、原文 payload、哈希链 |
 | 心跳 | `~/.dsh/guardrails/loaded.json` |
 
 ```json
 {
   "version": 1,
   "enabled": true,
+  "audit": { "format": "v2", "maxPayloadBytes": 65536 },
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
     "critical":       { "mode": "deny", "patterns": [], "failClosed": true },
@@ -97,7 +98,23 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 
 `patterns` 用于在内置清单之外追加你自己的正则；`critical.patterns` 追加到硬停层；
 `critical.failClosed` 让硬停层在判定异常时保持关闭状态。策略文件写坏时会被忽略并沿用上一份好配置——
-门禁不会因为一次误编辑而消失。
+门禁不会因为一次误编辑而消失。`audit.format: "v1"` 可退回旧的单文件日志。
+
+## 审计
+
+每次被拦的调用会写成共享同一个 `id` 的一串事件：闸门处的 `requested`、审批服务接手时的 `delivered`、
+用户或护栏作出决定时的 `outcome`、批准后真正执行完的 `executed`。记录用 `prevHash` 串成哈希链，
+被编辑或截断的行能被发现；命令原文存在 `payload/`（密钥只留哈希）。
+
+离线读取：
+
+```powershell
+node dsh-guardrails/tools/audit-report.mjs            # 最近 20 条
+node dsh-guardrails/tools/audit-report.mjs --stats     # 按事件 / 规则 / 结果统计
+node dsh-guardrails/tools/audit-report.mjs --verify    # 校验哈希链，断裂时退出码 1
+node dsh-guardrails/tools/audit-report.mjs --rule R2 --event outcome --show-payload
+```
+
 
 ## 仓库结构
 
@@ -105,6 +122,7 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 |---|---|
 | `dsh-guardrails/` | 插件本体：`index.js`（宿主接线）、`rules.js`（纯判定逻辑） |
 | `dsh-guardrails/test/` | 规则测试与打包冒烟测试 |
+| `dsh-guardrails/tools/` | `audit-report.mjs`——离线读取审计事件流 |
 | `design/` | 设计文档与边界记录——P1.6 系统级硬停及其已知限制 |
 | `CHANGELOG.md` | 版本历史（英文与中文两份） |
 | `scripts/` | 维护者工具：审计脱敏、快照/恢复、健康检查。**只留本地（已 gitignore），不属于本仓库** |
@@ -117,7 +135,7 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 无构建、无运行时依赖，测试直接跑：
 
 ```powershell
-npm test   # 依次跑六个测试文件
+npm test   # 依次跑七个测试文件
 ```
 
 要用 `node <文件>` 而不是 `node --test`：DSH 沙箱不允许测试运行器派生子进程。
@@ -132,7 +150,8 @@ npm test   # 依次跑六个测试文件
   都不经过匹配器（`regedit /s` 因脚本不可见已被按 critical 拒绝）。critical 层管的是命令文本，
   不是脚本或配置单元的内容。
 - **审批界面不完全受插件控制。** 弹窗由宿主渲染，插件只能提供文案。
-- **现在的审计只记录"命中"，不记录"决定"。** 记录人工决策在路线图上。
+- **审计只覆盖被拦截的调用。** 没命中规则、或根本没过闸门的调用不会留下记录。记录能证明插件判了什么、
+  宿主执行了什么，却不能证明 DSH 之外发生了什么。
 - 仅 Windows。
 
 ## 卸载

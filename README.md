@@ -85,13 +85,14 @@ keeps working in a new one. Freshness plus version is the signal.
 |---|---|
 | Policy | `~/.dsh/guardrails/policy.json` — re-read within 2 seconds, no restart |
 | Policy override | Environment variable `DSH_GUARDRAILS_POLICY` |
-| Audit | `~/.dsh/guardrails/audit/audit-YYYY-MM-DD.jsonl` (local date) |
+| Audit | `~/.dsh/guardrails/audit/v2/` — one JSONL per day, payloads, and a hash chain |
 | Heartbeat | `~/.dsh/guardrails/loaded.json` |
 
 ```json
 {
   "version": 1,
   "enabled": true,
+  "audit": { "format": "v2", "maxPayloadBytes": 65536 },
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
     "critical":       { "mode": "deny", "patterns": [], "failClosed": true },
@@ -104,7 +105,24 @@ keeps working in a new one. Freshness plus version is the signal.
 `patterns` appends your own regular expressions to the built-in lists. `critical.patterns` adds your own
 regexes to the hard-stop tier; `critical.failClosed` keeps that tier closed when evaluation itself throws.
 A corrupt policy file is ignored in favour of the last good copy — the gate never disappears because of a
-bad edit.
+bad edit. `audit.format: "v1"` falls back to the old single-file log.
+
+## Audit
+
+Every gated call becomes a short chain of records sharing one `id`: `requested` at the gate, `delivered`
+when the approval service accepts the question, `outcome` when the user or the guard decides, and
+`executed` when an approved call really ran. Records are linked by `prevHash`, so an edited or truncated
+line is detectable; the full command text is stored under `payload/` (secrets keep only their hash).
+
+Read it offline:
+
+```powershell
+node dsh-guardrails/tools/audit-report.mjs            # last 20 events
+node dsh-guardrails/tools/audit-report.mjs --stats     # counts by event / rule / outcome
+node dsh-guardrails/tools/audit-report.mjs --verify    # hash-chain check, exit 1 when broken
+node dsh-guardrails/tools/audit-report.mjs --rule R2 --event outcome --show-payload
+```
+
 
 ## Repository layout
 
@@ -112,6 +130,7 @@ bad edit.
 |---|---|
 | `dsh-guardrails/` | The plugin: `index.js` (host wiring), `rules.js` (pure decision logic) |
 | `dsh-guardrails/test/` | Rule tests and package smoke test |
+| `dsh-guardrails/tools/` | `audit-report.mjs` — offline reader for the audit stream |
 | `design/` | Design notes and boundary records — the P1.6 critical tier and its known limits |
 | `CHANGELOG.md` | Release history — English and Chinese versions |
 | `scripts/` | Maintainer tooling — audit redaction, snapshot/restore, health check. **Kept local (git-ignored), not part of this repository** |
@@ -124,7 +143,7 @@ them locally, then encrypts the result with Windows DPAPI (bound to the current 
 No build step, no runtime dependencies. Tests run directly:
 
 ```powershell
-npm test   # runs the six test files in order
+npm test   # runs the seven test files in order
 ```
 
 Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the child processes that runner spawns.
@@ -142,7 +161,9 @@ Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the chil
   script is invisible). The critical tier covers command text, not the contents of scripts or hives.
 - **Approval surfaces may not match the plan.** The host renders the decision prompt; the plugin can only
   supply its text.
-- **Audit records the match today, not the outcome.** Logging the human decision is on the roadmap.
+- **Audit covers gated calls only.** Calls that never hit a rule are not logged, and a call the gate never
+  saw leaves no trace. Records prove what the plugin decided and what the host executed, not what happened
+  outside DSH.
 - Windows only.
 
 ## Uninstall

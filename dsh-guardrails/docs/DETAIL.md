@@ -40,7 +40,9 @@ so changes do not need a restart:
 
 ## What you get afterwards
 
-- **Audit**: `~/.dsh/guardrails/audit/audit-YYYY-MM-DD.jsonl`, one line per gated call.
+- **Audit**: `~/.dsh/guardrails/audit/v2/` — `requested` / `delivered` / `outcome` / `executed` records
+  with a hash chain; full command text lives under `payload/`, secrets keep only the hash. Read it with
+  `node tools/audit-report.mjs --stats --verify`.
 - **Heartbeat**: `~/.dsh/guardrails/loaded.json`. Fresh mtime plus a matching version is the liveness
   signal; a pid proves nothing.
 - **No new daemon**: it runs inside the DSH host process.

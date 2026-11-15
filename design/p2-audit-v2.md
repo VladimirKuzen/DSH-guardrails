@@ -1,8 +1,18 @@
-# P2 审计 v2 设计（草案）
+# P2 审计 v2 设计
 
-- 状态：草案 v0.1，2026-11-15
+- 状态：v1.0（第一批已实现，2026-11-15，对应 1.3.0；live 复测见下）
 - 目标版本：1.3.0（第一批）、1.4.0（第二批，工作区静默）
 - 读者：维护者本人（本文件用中文写，便于反复阅读）
+
+## 0. 实现状态（2026-11-15）
+
+- 第一批已在 1.3.0 落地：`dsh-guardrails/lib/audit/v2.js`（事件流、payload、哈希链、`verifyChain`）、
+  `index.js` 的 `requested / delivered / outcome / executed` 接线、`tools/audit-report.mjs`、
+  `test/audit.test.mjs`（9 条）与 `test/plugin.smoke.mjs` 的 v2 断言。
+- 离线验证已完成：`--stats`、`--verify`、`--show-payload` 在夹具上通过；102 条测试全绿。
+- 待 live 验证：根上下文能否收到 `session/event`（若收不到，改为 `ctx.on('session/event', fn, { global: true })`，
+  已在代码注释里标明）。验证方法：重启后触发一次 R2 ask，用 `audit-report.mjs` 看是否出现 `delivered`。
+- 未做：1.4.0 的 `workspaceQuiet`（P1.7），按计划在第二批。
 
 ## 1. 要解决的问题
 

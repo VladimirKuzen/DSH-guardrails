@@ -8,9 +8,9 @@ _acl-reports/
 # Machine-local operations scripts: kept on disk, never published
 scripts/
 
-# Runtime data — never commit
-audit/
-vault/
+# Runtime data — never commit (root-level only; lib/audit is source)
+/audit/
+/vault/
 *.log
 
 # Local-only remote address (see git-remote.local.txt)

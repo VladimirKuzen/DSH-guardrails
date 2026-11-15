@@ -4,14 +4,20 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
-## [Unreleased]
+## [1.3.0] - 2026-11-15
 
+- Audit rewrites itself as an event stream (`audit/v2/`): `requested` at the gate, `delivered` when the
+  approval service accepts the question, `outcome` when the user or the guard decides, `executed` when an
+  approved call really ran. The old single-file log stays readable; `audit.format: "v1"` falls back to it.
+- The whole command text is stored under `payload/`, so "what exactly ran" is answerable later; secrets
+  keep only the SHA-256. Targets are truncated by code point, not by byte.
+- Records form a hash chain (`chain.json` + `prevHash`); `tools/audit-report.mjs --verify` detects an
+  edited or truncated line, and `--stats` / `--show-payload` read the stream offline.
 - One README for the repository: the plugin-level README was removed, and the root README now covers
   installation, rules, and layout. Package `files` no longer lists it.
 - Design notes moved from `docs/` to `design/`, so the root folder no longer collides with the plugin's
   `dsh-guardrails/docs/` (the source of the plugin detail page).
-- MIT license added.
-- Bilingual file headers; inline comments are English only.
+- MIT license added; bilingual file headers, inline comments are English only.
 
 ## [1.2.3] - 2026-11-15
 

@@ -4,12 +4,17 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
-## [未发布]
+## [1.3.0] - 2026-11-15
 
+- 审计改为事件流（`audit/v2/`）：闸门处写 `requested`，审批服务接手时写 `delivered`，用户或护栏作出决定时写
+  `outcome`，批准后真正执行完写 `executed`。旧的单文件日志仍可读；`audit.format: "v1"` 可退回旧格式。
+- 命令原文落在 `payload/`，"当时到底执行了什么"事后可查；密钥只留 SHA-256。target 按 Unicode 码点截断，
+  不再按字节截断。
+- 记录用哈希链串联（`chain.json` + `prevHash`）；`tools/audit-report.mjs --verify` 能发现被编辑或截断的行，
+  `--stats` / `--show-payload` 可离线读取。
 - 仓库只保留一份 README：删除插件级 README，根 README 统一覆盖安装、规则与结构；包的 `files` 白名单不再包含它。
 - 设计文档从 `docs/` 移到 `design/`，根目录不再与插件的 `dsh-guardrails/docs/`（插件详情页数据源）重名。
-- 增加 MIT 许可证。
-- 文件头中英双语；内联注释只用英文。
+- 增加 MIT 许可证；文件头中英双语，内联注释只用英文。
 
 ## [1.2.3] - 2026-11-15
 

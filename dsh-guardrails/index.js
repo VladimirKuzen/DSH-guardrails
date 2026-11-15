@@ -13,6 +13,12 @@
  * 命中红线时返回 `ask`（弹出审批，单次放行）或 `deny`（直接拒绝），
  * 并把"谁、哪条红线、什么时候"写进审计日志——只记标签，绝不记密钥原文。
  *
+ * Since 1.3.0 the audit is an event stream (audit/v2): `requested` at the gate,
+ * `delivered` when the approval service accepts the question, `outcome` when the
+ * user or the guard decides, `executed` when an approved call really ran.
+ * 自 1.3.0 起审计改为事件流（audit/v2）：闸门处写 `requested`，审批服务接手时写
+ * `delivered`，用户或护栏作出决定时写 `outcome`，批准后真正执行完写 `executed`。
+ *
  * Every internal error allows the call (fail-open): the guard must not break the
  * tool chain. The one exception is the critical tier — a shell call that still
  * matches a dangerous pattern is refused when evaluation itself throws
@@ -23,12 +29,14 @@
  */
 
 import { appendFileSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { criticalFallback, evaluate } from './rules.js';
 import { collectFacts } from './lib/facts.js';
 import { describe } from './lib/describe.js';
+import { AuditLog, escapeControl, truncateCodePoints } from './lib/audit/v2.js';
 
 export const name = 'guardrails';
 export const inject = ['tools'];
@@ -38,6 +46,7 @@ const VERSION = JSON.parse(readFileSync(new URL('./package.json', import.meta.ur
 
 const DEFAULTS = {
   enabled: true,
+  audit: { format: 'v2', maxPayloadBytes: 64 * 1024 },
   rules: {
     protectDshHome: { mode: 'ask', roots: ['~/.dsh', '~/.agents'], alwaysAskTools: ['plugin_manager'] },
     critical: { mode: 'deny', patterns: [], failClosed: true },
@@ -45,6 +54,11 @@ const DEFAULTS = {
     secrets: { mode: 'ask', patterns: [] },
   },
 };
+
+/** How long an unanswered `requested` stays in the in-memory pending table. */
+const PENDING_TTL_MS = 10 * 60 * 1000;
+/** `target` is presentation text; 300 code points is plenty and stays readable. */
+const MAX_TARGET = 300;
 
 function dshHome() {
   const fromEnv = process.env.DSH_HOME;
@@ -83,8 +97,8 @@ function readPolicyFile(path) {
   }
 }
 
-/** Append one hit to the per-day audit file. Never writes the secret itself. */
-function audit(dir, record) {
+/** v1 writer, kept for `audit.format: "v1"`. Never writes the secret itself. */
+function auditV1(dir, record) {
   try {
     mkdirSync(dir, { recursive: true });
     const at = new Date(record.ts);
@@ -101,6 +115,24 @@ function summarize(exec) {
   if (typeof args.path === 'string') return args.path;
   const command = typeof args.command === 'string' ? args.command : '';
   return command === '' ? '' : command.length > 120 ? `${command.slice(0, 120)}…` : command;
+}
+
+/** Presentation target for the audit: code-point truncation, controls escaped. */
+function auditTarget(exec, verdict) {
+  if (verdict.rule === 'R3') {
+    const filePath = typeof exec?.arguments?.file_path === 'string' ? exec.arguments.file_path : '';
+    if (filePath !== '') return truncateCodePoints(escapeControl(filePath), MAX_TARGET).text;
+    return null;
+  }
+  const raw = summarize(exec);
+  return raw === '' ? null : truncateCodePoints(escapeControl(raw), MAX_TARGET).text;
+}
+
+/** Full text of the operation; R3 stores no payload, only its hash. */
+function payloadOf(exec, verdict) {
+  const args = exec?.arguments ?? {};
+  const text = typeof args.command === 'string' ? args.command : JSON.stringify(args, null, 2);
+  return { payload: text, secret: verdict.rule === 'R3' };
 }
 
 export function apply(ctx, config = {}) {
@@ -156,6 +188,70 @@ export function apply(ctx, config = {}) {
       .replace(/%([A-Za-z_][A-Za-z0-9_]*)%/g, (_, key) => process.env[key] ?? '');
   };
 
+  /** True when the event stream is the configured audit format. */
+  const usesV2 = () => loadPolicy().audit?.format !== 'v1';
+
+  let log = null;
+  const auditLog = () => {
+    if (log === null) {
+      const maxPayloadBytes = loadPolicy().audit?.maxPayloadBytes;
+      log = new AuditLog({
+        dir: join(auditDir(), 'v2'),
+        ...(Number.isInteger(maxPayloadBytes) && maxPayloadBytes > 0 ? { maxPayloadBytes } : {}),
+      });
+    }
+    return log;
+  };
+
+  /** Write one v2 record; a failed audit write must never change the verdict. */
+  const emit = (input) => {
+    if (!usesV2()) return;
+    try {
+      auditLog().append(input);
+    } catch {
+      // fail-open on audit I/O
+    }
+  };
+
+  // callId -> pending operation, so approval/asked can be matched back to the gate.
+  const pending = new Map();
+  const byApproval = new Map();
+
+  const forget = (entry) => {
+    pending.delete(entry.callId);
+    if (entry.approvalRequestId !== undefined) byApproval.delete(entry.approvalRequestId);
+  };
+
+  const prunePending = () => {
+    const now = Date.now();
+    for (const entry of [...pending.values()]) {
+      if (now - entry.at > PENDING_TTL_MS) forget(entry);
+    }
+  };
+
+  const fieldsFor = (exec, verdict, facts, displayReason) => ({
+    sessionId: exec?.agent?.session?.id ?? null,
+    cwd: exec?.agent?.session?.cwd ?? null,
+    tool: exec?.name ?? '?',
+    callId: exec?.callId ?? null,
+    rule: verdict.rule,
+    mode: verdict.mode,
+    ...(verdict.severity === undefined ? {} : { severity: verdict.severity }),
+    target: auditTarget(exec, verdict),
+    facts: facts ?? null,
+    displayReason: displayReason ?? null,
+    localeAtDecision: process.env.DSH_LOCALE ?? null,
+  });
+
+  /** `requested` + `outcome` for calls the guard refuses without a card. */
+  const recordRefusal = (exec, verdict, fields) => {
+    const id = randomUUID();
+    const payload = payloadOf(exec, verdict);
+    emit({ id, event: 'requested', ...fields, delivered: false, ...payload });
+    emit({ id, event: 'outcome', ...fields, outcome: 'denied', source: 'guardrail' });
+    return id;
+  };
+
   ctx.on('tools/pre-execute', async (exec, next) => {
     let verdict;
     let policy;
@@ -173,8 +269,21 @@ export function apply(ctx, config = {}) {
           envForRules(),
         );
         if (fallback !== null) {
+          const fallbackFields = {
+            sessionId: exec?.agent?.session?.id ?? null,
+            cwd: exec?.agent?.session?.cwd ?? null,
+            tool: exec?.name ?? '?',
+            callId: exec?.callId ?? null,
+            rule: fallback.rule,
+            mode: fallback.mode,
+            ...(fallback.severity === undefined ? {} : { severity: fallback.severity }),
+            target: truncateCodePoints(escapeControl(summarize(exec)), MAX_TARGET).text,
+            facts: null,
+            displayReason: null,
+            localeAtDecision: process.env.DSH_LOCALE ?? null,
+          };
           try {
-            audit(auditDir(), {
+            auditV1(auditDir(), {
               ts: new Date().toISOString(),
               rule: fallback.rule,
               mode: fallback.mode,
@@ -186,6 +295,7 @@ export function apply(ctx, config = {}) {
           } catch {
             // A failed audit write must not cancel the refusal
           }
+          recordRefusal(exec, fallback, fallbackFields);
           heartbeat();
           return { kind: 'deny', reason: fallback.reason, info: { name: 'GuardrailsDenied', code: fallback.rule } };
         }
@@ -196,21 +306,46 @@ export function apply(ctx, config = {}) {
     }
     if (verdict === null) return next();
 
+    let facts = null;
+    let displayReason;
     try {
-      audit(auditDir(), {
-        ts: new Date().toISOString(),
-        rule: verdict.rule,
-        mode: verdict.mode,
-        ...(verdict.severity === undefined ? {} : { severity: verdict.severity }),
-        tool: exec?.name ?? '?',
-        decision: verdict.mode === 'deny' ? 'denied' : 'asked',
-        ...(verdict.label === undefined ? {} : { label: verdict.label }),
-        // R3 logs the label only, never the value; R1/R2 log the target path or
-        // command prefix so a hit can be traced later.
-        ...(verdict.rule === 'R3' ? {} : { target: summarize(exec) }),
-      });
+      const roots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
+      facts = collectFacts(exec, verdict, { ...process.env, ...envForRules() }, { roots });
+      displayReason = describe(verdict, facts);
     } catch {
-      // A failed audit write must not change the verdict
+      displayReason = undefined;
+    }
+
+    const fields = fieldsFor(exec, verdict, facts, displayReason);
+
+    if (usesV2()) {
+      if (verdict.mode === 'deny') {
+        recordRefusal(exec, verdict, fields);
+      } else {
+        prunePending();
+        const id = randomUUID();
+        if (exec?.callId !== undefined) {
+          pending.set(exec.callId, { id, at: Date.now(), callId: exec.callId, approvalRequestId: undefined, approvalOutcome: undefined, fields });
+        }
+        emit({ id, event: 'requested', ...fields, delivered: false, ...payloadOf(exec, verdict) });
+      }
+    } else {
+      try {
+        auditV1(auditDir(), {
+          ts: new Date().toISOString(),
+          rule: verdict.rule,
+          mode: verdict.mode,
+          ...(verdict.severity === undefined ? {} : { severity: verdict.severity }),
+          tool: exec?.name ?? '?',
+          decision: verdict.mode === 'deny' ? 'denied' : 'asked',
+          ...(verdict.label === undefined ? {} : { label: verdict.label }),
+          // R3 logs the label only, never the value; R1/R2 log the target path or
+          // command prefix so a hit can be traced later.
+          ...(verdict.rule === 'R3' ? {} : { target: summarize(exec) }),
+        });
+      } catch {
+        // A failed audit write must not change the verdict
+      }
     }
     heartbeat();
 
@@ -218,22 +353,64 @@ export function apply(ctx, config = {}) {
       return { kind: 'deny', reason: verdict.reason, info: { name: 'GuardrailsDenied', code: verdict.rule } };
     }
 
-    // Presentation copy is built here, at the edge, so rules.js stays pure and
-    // without filesystem access. Any failure falls back to the English reason.
-    let displayReason;
-    try {
-      const roots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
-      const facts = collectFacts(exec, verdict, { ...process.env, ...envForRules() }, { roots });
-      displayReason = describe(verdict, facts);
-    } catch {
-      displayReason = undefined;
-    }
-
     return {
       kind: 'ask',
       reason: verdict.reason,
       ...(displayReason === undefined ? {} : { displayReason }),
     };
+  });
+
+  // The approval service appends these two session events; `asked` carries the
+  // callId, which is the only stable link back to the gate's pending entry.
+  ctx.on('session/event', (session, event) => {
+    try {
+      const type = event?.type;
+      const data = event?.data ?? {};
+      if (type === 'approval/asked') {
+        const entry = typeof data.callId === 'string' ? pending.get(data.callId) : undefined;
+        if (entry === undefined) return;
+        entry.approvalRequestId = data.id;
+        byApproval.set(data.id, entry);
+        emit({ id: entry.id, event: 'delivered', ...entry.fields, approvalRequestId: data.id, deliveredAt: new Date().toISOString() });
+      } else if (type === 'approval/decided') {
+        const entry = byApproval.get(data.id);
+        if (entry === undefined) return;
+        entry.approvalOutcome = data.outcome;
+        emit({
+          id: entry.id,
+          event: 'outcome',
+          ...entry.fields,
+          outcome: data.outcome,
+          source: 'user',
+          approvalRequestId: entry.approvalRequestId,
+        });
+      }
+    } catch {
+      // Observers must never disturb the session append
+    }
+  });
+
+  // A denial also reaches post-execute (as an error result), so only an
+  // `allowed-once` outcome followed by this hook proves the body really ran.
+  ctx.on('tools/post-execute', async (exec, result, next) => {
+    try {
+      const entry = exec?.callId !== undefined ? pending.get(exec.callId) : undefined;
+      if (entry !== undefined) {
+        if (entry.approvalOutcome === 'allowed-once') {
+          emit({
+            id: entry.id,
+            event: 'executed',
+            ...entry.fields,
+            isError: Boolean(result?.isError),
+            errorCode: result?.error?.info?.code ?? result?.error?.code ?? null,
+          });
+        }
+        forget(entry);
+      }
+    } catch {
+      // Never change the tool result
+    }
+    return next();
   });
 
   ctx.logger?.info?.(`guardrails: policy at ${policyPath}, audit at ${auditDir()}`);
