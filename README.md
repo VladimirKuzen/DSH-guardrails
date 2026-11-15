@@ -113,7 +113,7 @@ bad edit.
 | `dsh-guardrails/` | The plugin: `index.js` (host wiring), `rules.js` (pure decision logic) |
 | `dsh-guardrails/test/` | Rule tests and package smoke test |
 | `docs/` | Design and implementation plan |
-| `scripts/` | Maintainer tooling — audit redaction, snapshot/restore, health check. **Not shipped with the plugin** |
+| `scripts/` | Maintainer tooling — audit redaction, snapshot/restore, health check. **Kept local (git-ignored), not part of this repository** |
 
 Maintainer tooling exists because audit files contain command text and paths. It snapshots and redacts
 them locally, then encrypts the result with Windows DPAPI (bound to the current user account).

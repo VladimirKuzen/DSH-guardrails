@@ -4,6 +4,9 @@ _scratch/
 *.bak
 *.tmp
 
+# Machine-local operations scripts: kept on disk, never published
+scripts/
+
 # Runtime data — never commit
 audit/
 vault/
