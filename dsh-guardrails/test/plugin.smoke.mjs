@@ -190,6 +190,44 @@ test('critical downgraded to ask shows the ⛔ headline', async () => {
   assert.ok(decision.displayReason.zh.includes('系统目录'), decision.displayReason.zh);
 });
 
+test('the session cwd is recorded with its source', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const ctx = fakeCtx();
+
+  await ctx.pre({
+    name: 'write',
+    arguments: { file_path: 'C:\\Users\\Tester\\.dsh\\AGENTS.md', content: 'x' },
+    callId: 'c6',
+    agent: { session: { id: 's1', cwd: 'D:\\work' } },
+  }, next);
+
+  const record = auditLines().find((r) => r.callId === 'c6');
+  assert.equal(record.cwd, 'D:\\work');
+  assert.equal(record.cwdSource, 'session');
+});
+
+test('without a session cwd the shell workdir is recorded as source "tool"', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const ctx = fakeCtx();
+
+  await ctx.pre(call('pwsh', { command: 'Remove-Item -Recurse .\\dist', workdir: 'D:\\work\\sub' }, 'c7'), next);
+
+  const record = auditLines().find((r) => r.callId === 'c7');
+  assert.equal(record.cwd, 'D:\\work\\sub');
+  assert.equal(record.cwdSource, 'tool');
+});
+
+test('a workdir on a non-shell tool is not treated as cwd', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const ctx = fakeCtx();
+
+  await ctx.pre(call('write', { file_path: 'C:\\Users\\Tester\\.dsh\\AGENTS.md', content: 'x', workdir: 'D:\\work' }, 'c8'), next);
+
+  const record = auditLines().find((r) => r.callId === 'c8');
+  assert.equal(record.cwd, null);
+  assert.equal(record.cwdSource, null);
+});
+
 test('audit.format "v1" keeps the old single-file format', async () => {
   rmSync(join(dir, 'audit'), { recursive: true, force: true });
   writePolicy({ enabled: true, auditDir: join(dir, 'audit'), audit: { format: 'v1' } });

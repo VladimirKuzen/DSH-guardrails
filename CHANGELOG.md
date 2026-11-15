@@ -4,6 +4,12 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
+## [1.3.2] - 2026-11-15
+
+- Audit records now carry `cwd` plus `cwdSource` (`session`, `tool` or `null`): the session working
+  directory when the session has one, otherwise the shell tool's explicit `workdir`. The host process
+  directory is deliberately never used — it is the install directory, not the workspace.
+
 ## [1.3.1] - 2026-11-15
 
 - Fix the hash chain: `canonicalJson` now mirrors `JSON.stringify` for undefined values, so a record whose

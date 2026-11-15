@@ -4,6 +4,11 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
+## [1.3.2] - 2026-11-15
+
+- 审计记录新增 `cwd` 与 `cwdSource`（`session`、`tool` 或 `null`）：会话有工作目录时记会话目录，
+  否则记 shell 工具显式传入的 `workdir`。刻意不取宿主进程目录——那是安装目录，不是工作区。
+
 ## [1.3.1] - 2026-11-15
 
 - 修复哈希链：`canonicalJson` 现在与 `JSON.stringify` 对 undefined 的处理一致。`facts` 里 `severity` 为空时，

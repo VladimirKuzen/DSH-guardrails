@@ -144,6 +144,7 @@ export class AuditLog {
       ts: date.toISOString(),
       sessionId: input.sessionId ?? null,
       cwd: input.cwd ?? null,
+      cwdSource: input.cwdSource ?? null,
       tool: input.tool ?? null,
       callId: input.callId ?? null,
       rule: input.rule ?? null,

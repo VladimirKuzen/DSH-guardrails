@@ -100,7 +100,8 @@ model 发起工具调用
 | `event` | enum | 五类之一 |
 | `ts` | ISO-8601（UTC，毫秒） | 写入时间 |
 | `sessionId` | string | 会话 id |
-| `cwd` | string \| null | 会话工作目录 |
+| `cwd` | string \| null | 会话工作目录；取不到时为空 |
+| `cwdSource` | `session｜tool｜null` | `cwd` 的来源：会话本身、shell 工具的 `workdir` 参数、或未取到 |
 | `tool` | string | 工具名（`pwsh`、`write` 等） |
 | `callId` | string \| null | 工具调用 id，用于把审批事件串回来 |
 | `rule` | `R1｜R2｜R3` | 命中规则 |
@@ -123,6 +124,9 @@ model 发起工具调用
 - `delivered`：`approvalRequestId`、`deliveredAt`
 - `outcome`：`outcome`（四种之一）、`source`（`user｜guardrail`）、`approvalRequestId`（护栏拒绝时省略）
 - `executed`：`isError`、`errorCode`、`durationMs`
+
+`cwd` 的回退顺序是 `session.cwd` → shell 工具的 `workdir` 参数 → 空。**刻意不取 `process.cwd()`**：
+那是宿主进程的启动目录（通常是安装目录），写进"当时在哪个目录"会被当成工作区误读；宁可留空。
 - `allowed`：`quiet: "workspace"`
 
 ## 5. 文件布局

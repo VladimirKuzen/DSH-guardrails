@@ -34,6 +34,7 @@ import { homedir } from 'node:os';
 import { join } from 'node:path';
 
 import { criticalFallback, evaluate } from './rules.js';
+import { SHELL_TOOLS } from './lib/rules/kit.js';
 import { collectFacts } from './lib/facts.js';
 import { describe } from './lib/describe.js';
 import { AuditLog, escapeControl, truncateCodePoints } from './lib/audit/v2.js';
@@ -229,9 +230,27 @@ export function apply(ctx, config = {}) {
     }
   };
 
+  /**
+   * Where the call was aimed. A session without `cwd` is common, and the host
+   * process directory is not the workspace — so fall back to the shell tool's
+   * explicit `workdir` argument, and otherwise record nothing rather than a
+   * value the reader would misread.
+   */
+  const resolveCwd = (exec) => {
+    const sessionCwd = exec?.agent?.session?.cwd;
+    if (typeof sessionCwd === 'string' && sessionCwd !== '') {
+      return { cwd: sessionCwd, cwdSource: 'session' };
+    }
+    const workdir = exec?.arguments?.workdir;
+    if (SHELL_TOOLS.has(exec?.name) && typeof workdir === 'string' && workdir.trim() !== '') {
+      return { cwd: workdir, cwdSource: 'tool' };
+    }
+    return { cwd: null, cwdSource: null };
+  };
+
   const fieldsFor = (exec, verdict, facts, displayReason) => ({
     sessionId: exec?.agent?.session?.id ?? null,
-    cwd: exec?.agent?.session?.cwd ?? null,
+    ...resolveCwd(exec),
     tool: exec?.name ?? '?',
     callId: exec?.callId ?? null,
     rule: verdict.rule,
@@ -271,7 +290,7 @@ export function apply(ctx, config = {}) {
         if (fallback !== null) {
           const fallbackFields = {
             sessionId: exec?.agent?.session?.id ?? null,
-            cwd: exec?.agent?.session?.cwd ?? null,
+            ...resolveCwd(exec),
             tool: exec?.name ?? '?',
             callId: exec?.callId ?? null,
             rule: fallback.rule,

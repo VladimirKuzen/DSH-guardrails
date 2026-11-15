@@ -97,6 +97,7 @@ function summaryLine(record) {
     String(record.tool ?? '-').padEnd(9),
     record.severity === undefined ? '' : `[${record.severity}]`,
     record.outcome === undefined ? '' : `outcome=${record.outcome}`,
+    record.cwd === null || record.cwd === undefined ? '' : `cwd=${record.cwd}${record.cwdSource === null || record.cwdSource === undefined ? '' : `(${record.cwdSource})`}`,
     record.target === null || record.target === undefined ? '' : `target=${record.target}`,
   ];
   return bits.filter((part) => part !== '').join(' ');
