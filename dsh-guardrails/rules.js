@@ -17,7 +17,6 @@
  * Presentation copy (displayReason) is built by the host in index.js.
  */
 
-import { readOnlyDiagnostic } from './lib/critical.js';
 import {
   DEFAULT_DESTRUCTIVE,
   DEFAULT_SECRETS,
@@ -28,6 +27,7 @@ import {
   str,
 } from './lib/rules/kit.js';
 import { evaluateR1 } from './lib/rules/r1-home.js';
+import { evaluateR2 } from './lib/rules/r2-destructive.js';
 import { evaluateR3 } from './lib/rules/r3-secrets.js';
 
 // Kept as part of this module's public surface: tests and policy examples import them.
@@ -65,8 +65,6 @@ export function criticalFallback(policy, call, env = {}) {
 export function evaluate(policy, call, env) {
   if (policy === null || typeof policy !== 'object' || policy.enabled === false) return null;
   const rules = policy.rules ?? {};
-  const name = str(call?.name);
-  const args = call?.arguments ?? call?.args ?? {};
 
   // ---- R3 secrets (most severe, evaluated first)
   const secret = evaluateR3(call, rules.secrets ?? {});
@@ -76,51 +74,6 @@ export function evaluate(policy, call, env) {
   const home = evaluateR1(call, rules.protectDshHome ?? {}, env);
   if (home !== null) return home;
 
-  // ---- R2c critical hard stop (read-only diagnostics pass before destructive matching)
-  const criticalRule = rules.critical ?? {};
-  if (criticalRule.mode !== 'off' && SHELL_TOOLS.has(name)) {
-    const command = str(args.command ?? args.cmd ?? args.script);
-    const critical = findCritical(command, env, criticalRule.patterns ?? []);
-    if (critical !== null) {
-      const mode = criticalRule.mode === 'ask' ? 'ask' : 'deny';
-      return {
-        rule: 'R2',
-        severity: 'critical',
-        category: critical.category,
-        mode,
-        reason: criticalReason(critical, mode),
-        ...(critical.target === '' ? {} : { target: critical.target }),
-      };
-    }
-
-    // Read-only diagnostics stay usable; this must run before the R2 patterns,
-    // otherwise `diskpart list disk` would be caught by the bare `diskpart` one.
-    if (readOnlyDiagnostic(command)) return null;
-  }
-
-  // ---- R2 destructive operations
-  const destructiveRule = rules.destructive ?? {};
-  if (destructiveRule.mode !== 'off' && SHELL_TOOLS.has(name)) {
-    const command = str(args.command ?? args.cmd ?? args.script);
-    const patterns = [...DEFAULT_DESTRUCTIVE, ...(destructiveRule.patterns ?? [])];
-    for (const source of patterns) {
-      let re;
-      try {
-        re = new RegExp(source, 'i');
-      } catch {
-        continue;
-      }
-      const hit = re.exec(command);
-      if (hit) {
-        const shown = (hit[1] ?? hit[0]).trim();
-        return {
-          rule: 'R2',
-          mode: destructiveRule.mode === 'deny' ? 'deny' : 'ask',
-          reason: `Guardrails R2: destructive shell operation "${shown}" requires explicit approval.`,
-        };
-      }
-    }
-  }
-
-  return null;
+  // ---- R2 critical tier, read-only diagnostics, then destructive operations
+  return evaluateR2(call, rules, env);
 }
