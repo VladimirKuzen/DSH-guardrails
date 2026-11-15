@@ -1,7 +1,10 @@
 /**
- * 红线判定 —— 纯函数，不碰文件系统、不发事件，方便单测。
+ * Red-line evaluation. Pure: no file system access, no events, easy to unit test.
+ * 红线判定。纯函数：不碰文件系统、不发事件，方便单测。
  *
- * 三条红线：
+ * R1 keeps DSH's own home untouched (~/.dsh, ~/.agents, its plugins and profile);
+ * R2 asks before destructive shell operations;
+ * R3 keeps secrets in config files, never in the conversation.
  *   R1 不碰 DSH 自身目录（~/.dsh、~/.agents、插件与 profile）
  *   R2 破坏性操作先 dry-run
  *   R3 密钥只进配置文件，不进对话
@@ -13,15 +16,15 @@
 
 import { criticalVerdict, readOnlyDiagnostic } from './lib/critical.js';
 
-/** 会在文件系统上产生写入或删除的 shell 动词。`>` 要求不是 `=>` / `->` / `>>`。 */
+/** Shell verbs that write to or delete from the file system. The `>` branch must not match `=>`, `->` or `>>`. */
 const WRITE_VERBS = /\b(set-content|add-content|copy-item|move-item|remove-item|new-item|out-file|rename-item|clear-content|robocopy|cp|mv|rm|ri|del|erase|rd|ren|mkdir|tee)\b|(?<![=<>-])>(?!>)\s*[A-Za-z"$%]/i;
 
-/** 破坏性动词：默认清单，policy 里可以加。短别名要求出现在命令位置，避免误伤普通文本。 */
+/** Destructive verbs: the default list, extendable from policy. Short aliases must sit in command position so ordinary text is not flagged. */
 export const DEFAULT_DESTRUCTIVE = [
-  // 命令位置上的删除/移动/改名（避免把 "git commit -m 'rm old files'" 这类文本当成命令）
+  // Delete/move/rename in command position (so "git commit -m 'rm old files'" stays plain text)
   '(?:^|[\\n;&|(){]\\s*)(remove-item|ri|rm|del|erase|rd|rmdir|clear-content|move-item|mv|move|ren|rename|rename-item)(?=\\s|$)',
   '(?:^|[\\n;&|(){]\\s*)robocopy\\b[^\\n]*\\/(mir|mov|purge)',
-  // 只认真正的 format 命令；Format-Table / -Format 这类 PowerShell 参数不算
+  // Only real format commands; PowerShell parameters such as Format-Table / -Format are not counted
   '(?:^|[\\n;&|(){]\\s*)format(\\.(?:com|exe))?(?=\\s|$)',
   '\\bformat-volume\\b',
   '\\bdiskpart(?:\\.exe)?\\b',
@@ -49,13 +52,13 @@ export const DEFAULT_DESTRUCTIVE = [
   '\\bsfc(?:\\.exe)?\\b[^\\n]*\\/scan(?:now|once)\\b',
 ];
 
-/** 密钥特征：默认清单，policy 里可以加。只用于命中，不用于提取。 */
+/** Secret patterns: the default list, extendable from policy. Used for matching only, never for extracting. */
 export const DEFAULT_SECRETS = [
-  // 火山方舟 Ark：ark-<uuid>-xxxxx
+  // Fireworks Ark: ark-<uuid>-xxxxx
   'ark-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',
-  // OpenAI / Anthropic 风格
+  // OpenAI / Anthropic style
   'sk-[A-Za-z0-9_-]{20,}',
-  // AWS Access Key
+  // AWS access key
   'AKIA[0-9A-Z]{16}',
   // GitHub token
   'gh[pousr]_[A-Za-z0-9]{20,}',
@@ -63,11 +66,11 @@ export const DEFAULT_SECRETS = [
   'AIza[0-9A-Za-z_-]{35}',
   // Slack token
   'xox[abp]-[A-Za-z0-9-]{10,}',
-  // 通用 key=value 赋值
+  // Generic key=value assignment (the Chinese label is matched on purpose)
   '\\b(api[_-]?key|apikey|secret[_-]?key|access[_-]?token|auth[_-]?token|password|passwd|密码)\\b\\s*[:=：]\\s*["\']?[A-Za-z0-9_\\-\\.]{12,}',
-  // Bearer
+  // Bearer token
   '\\bbearer\\s+[A-Za-z0-9_\\-\\.]{20,}',
-  // 私钥块
+  // Private key block
   '-----BEGIN [A-Z ]*PRIVATE KEY-----',
 ];
 
@@ -91,7 +94,7 @@ function str(value) {
   return typeof value === 'string' ? value : '';
 }
 
-/** 把 ~ / %VAR% / $env:VAR 展开成绝对路径，统一反斜杠与小写，便于前缀比较。 */
+/** Expand ~ / %VAR% / $env:VAR to an absolute path; backslashes and case are normalized for prefix comparison. */
 export function expandPath(input, env) {
   let p = str(input).trim().replace(/^["']|["']$/g, '');
   if (p === '') return '';
@@ -104,7 +107,7 @@ export function expandPath(input, env) {
   return p.toLowerCase();
 }
 
-/** 取工具参数里表示路径的字段。 */
+/** First path-like argument of a tool call. */
 function pathOf(args) {
   if (args === null || typeof args !== 'object') return '';
   for (const key of ['file_path', 'filePath', 'path', 'target', 'destination']) {
@@ -113,7 +116,7 @@ function pathOf(args) {
   return '';
 }
 
-/** 收集参数里所有字符串，供密钥扫描。 */
+/** Collect every string in the arguments for secret scanning. */
 function allStrings(args, out = [], depth = 0) {
   if (depth > 4) return out;
   if (typeof args === 'string') {
@@ -130,7 +133,7 @@ function isUnder(path, roots) {
   return roots.some((root) => root !== '' && (path === root || path.startsWith(`${root}\\`)));
 }
 
-/** 找出命令里所有像路径的 `.dsh` / `.agents` 片段位置（兼容绝对路径与 $env: 写法）。 */
+/** Indices of every path-like `.dsh` / `.agents` mention (absolute paths and $env: forms). */
 function homeMentionIndices(command) {
   const indices = [];
   const re = /(^|[\\/'"=\s])\.(dsh|agents)(?=[\\/])/gi;
@@ -139,7 +142,7 @@ function homeMentionIndices(command) {
   return indices;
 }
 
-/** 只有写动词与 home 路径落在同一条语句（同一行、同一段管道）里，才算 R1。 */
+/** R1 only fires when a write verb and a home path sit in the same statement (same line or pipe segment). */
 function mentionsHomeNearWrite(command) {
   for (const index of homeMentionIndices(command)) {
     const start = Math.max(
@@ -226,10 +229,10 @@ export function criticalFallback(policy, call, env = {}) {
 }
 
 /**
- * 判定一次工具调用。
- * @param {object} policy 解析后的策略
- * @param {{name: string, args: unknown}} call 工具调用
- * @param {object} env 形如 { USERPROFILE, DSH_HOME, AGENTS_HOME }
+ * Decide one tool call.
+ * @param {object} policy parsed policy
+ * @param {{name: string, args: unknown}} call the tool call
+ * @param {object} env shape: { USERPROFILE, DSH_HOME, AGENTS_HOME }
  * @returns {null | {rule: string, mode: string, reason: string, label?: string}}
  */
 export function evaluate(policy, call, env) {
@@ -239,7 +242,7 @@ export function evaluate(policy, call, env) {
   const args = call?.arguments ?? call?.args ?? {};
   const strings = allStrings(args);
 
-  // ---- R3 密钥（最严重，先判）
+  // ---- R3 secrets (most severe, evaluated first)
   const secretRule = rules.secrets ?? {};
   if (secretRule.mode !== 'off') {
     const patterns = [...DEFAULT_SECRETS, ...(secretRule.patterns ?? [])];
@@ -272,7 +275,7 @@ export function evaluate(policy, call, env) {
     }
   }
 
-  // ---- R1 DSH 自身目录
+  // ---- R1 DSH's own home
   const homeRule = rules.protectDshHome ?? {};
   if (homeRule.mode !== 'off') {
     const roots = (homeRule.roots ?? ['~/.dsh', '~/.agents']).map((root) => expandPath(root, env)).filter(Boolean);
@@ -310,7 +313,7 @@ export function evaluate(policy, call, env) {
     }
   }
 
-  // ---- R2c 系统级硬停（只读诊断先于破坏性匹配放行）
+  // ---- R2c critical hard stop (read-only diagnostics pass before destructive matching)
   const criticalRule = rules.critical ?? {};
   if (criticalRule.mode !== 'off' && SHELL_TOOLS.has(name)) {
     const command = str(args.command ?? args.cmd ?? args.script);
@@ -331,7 +334,7 @@ export function evaluate(policy, call, env) {
     if (readOnlyDiagnostic(command)) return null;
   }
 
-  // ---- R2 破坏性操作
+  // ---- R2 destructive operations
   const destructiveRule = rules.destructive ?? {};
   if (destructiveRule.mode !== 'off' && SHELL_TOOLS.has(name)) {
     const command = str(args.command ?? args.cmd ?? args.script);

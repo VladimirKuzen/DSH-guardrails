@@ -1,5 +1,6 @@
 /**
  * Windows critical operations: the subset that is refused instead of asked.
+ * Windows 关键操作：不再“问”，而是直接拒绝的那一小部分。
  *
  * These are the operations where one "allow once" click can leave the machine
  * unbootable or erase a disk, and where the model cannot see what it needs to

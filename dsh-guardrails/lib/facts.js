@@ -1,5 +1,6 @@
 /**
  * Turn one tool call into language-neutral facts for the approval prompt.
+ * 把一次工具调用整理成与语言无关的事实，供审批卡片渲染。
  *
  * Pure with respect to DSH: it takes the call, the verdict and an environment
  * map; filesystem access is injected so tests never touch the disk.

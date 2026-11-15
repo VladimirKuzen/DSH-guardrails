@@ -1,5 +1,6 @@
 /**
  * Render approval text from facts and a locale pack.
+ * 用事实和语言包渲染审批文案。
  *
  * Returns one string per locale; the host picks the active language, so the
  * card never pays for a second language it will not display.

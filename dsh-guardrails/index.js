@@ -1,12 +1,22 @@
 /**
- * dsh-guardrails —— 把三条红线做成"全局环境"：
+ * dsh-guardrails — turns the three red lines into a global environment.
+ * dsh-guardrails —— 把三条红线做成"全局环境"。
  *
+ * R1 keeps writes out of DSH's own home, R2 asks before destructive shell
+ * operations, R3 keeps secrets out of the conversation.
  *   R1 不碰 DSH 自身目录     R2 破坏性操作先 dry-run     R3 密钥不进对话
  *
+ * It listens on the `tools/pre-execute` waterfall and decides every tool call.
+ * A hit returns `ask` (one-time approval) or `deny` (refused), and the audit log
+ * records who/what/when — labels only, never the secret itself.
  * 实现方式：监听 `tools/pre-execute` 瀑布，对每次工具调用判定一次。
  * 命中红线时返回 `ask`（弹出审批，单次放行）或 `deny`（直接拒绝），
  * 并把"谁、哪条红线、什么时候"写进审计日志——只记标签，绝不记密钥原文。
  *
+ * Every internal error allows the call (fail-open): the guard must not break the
+ * tool chain. The one exception is the critical tier — a shell call that still
+ * matches a dangerous pattern is refused when evaluation itself throws
+ * (fail-closed), see the catch branch below.
  * 任何内部异常都放行（fail-open）：护栏不能把工具链搞死。唯一的例外是
  * critical 层——判定本身抛异常时，仍然命中危险模式的 shell 调用会被拒绝
  * （fail-closed），见下面的 catch 分支。
@@ -50,7 +60,7 @@ function envForRules() {
   };
 }
 
-/** 深合并：文件里的同名字段覆盖默认，未写的保持默认。 */
+/** Deep merge: matching keys in the file override defaults; missing keys keep theirs. */
 function merge(base, override) {
   if (override === null || typeof override !== 'object' || Array.isArray(override)) {
     return override === undefined ? base : override;
@@ -73,7 +83,7 @@ function readPolicyFile(path) {
   }
 }
 
-/** 把命中记录追加到按天切的审计文件。绝不写密钥原文。 */
+/** Append one hit to the per-day audit file. Never writes the secret itself. */
 function audit(dir, record) {
   try {
     mkdirSync(dir, { recursive: true });
@@ -81,7 +91,7 @@ function audit(dir, record) {
     const day = `${at.getFullYear()}-${String(at.getMonth() + 1).padStart(2, '0')}-${String(at.getDate()).padStart(2, '0')}`;
     appendFileSync(join(dir, `audit-${day}.jsonl`), `${JSON.stringify(record)}\n`, 'utf8');
   } catch {
-    // 审计写不进去不影响主流程
+    // A failed audit write must not break the main flow
   }
 }
 
@@ -132,7 +142,7 @@ export function apply(ctx, config = {}) {
       const file = readPolicyFile(policyPath);
       cache = { at: now, mtime, policy: merge(DEFAULTS, file ?? config.policy ?? {}) };
     } catch {
-      // 文件写坏了就沿用上一份，不让护栏失效
+      // A corrupt policy file keeps the last good copy; the guard must not vanish
     }
     return cache.policy;
   };
@@ -174,7 +184,7 @@ export function apply(ctx, config = {}) {
               target: summarize(exec),
             });
           } catch {
-            // 审计失败不影响拒绝
+            // A failed audit write must not cancel the refusal
           }
           heartbeat();
           return { kind: 'deny', reason: fallback.reason, info: { name: 'GuardrailsDenied', code: fallback.rule } };
@@ -195,11 +205,12 @@ export function apply(ctx, config = {}) {
         tool: exec?.name ?? '?',
         decision: verdict.mode === 'deny' ? 'denied' : 'asked',
         ...(verdict.label === undefined ? {} : { label: verdict.label }),
-        // R3 只记标签，绝不记原文；R1/R2 记目标路径或命令前缀，便于事后追溯
+        // R3 logs the label only, never the value; R1/R2 log the target path or
+        // command prefix so a hit can be traced later.
         ...(verdict.rule === 'R3' ? {} : { target: summarize(exec) }),
       });
     } catch {
-      // 审计失败不影响判定
+      // A failed audit write must not change the verdict
     }
     heartbeat();
 
