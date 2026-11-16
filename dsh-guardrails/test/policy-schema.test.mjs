@@ -94,6 +94,14 @@ test('schema: a full policy with quiet and self-protect passes', () => {
   assert.equal(report.ok, true, describeErrors(report.errors));
 });
 
+test('schema: self-protect may observe during development, under version 2 only', () => {
+  const observing = { version: 2, enabled: true, rules: { selfProtect: { mode: 'observe', paths: [] } } };
+  assert.equal(validatePolicy(observing).ok, true, describeErrors(validatePolicy(observing).errors));
+  const v1 = validatePolicy({ version: 1, rules: { selfProtect: { mode: 'observe', paths: [] } } });
+  assert.equal(v1.ok, false);
+  assert.ok(v1.errors.some((error) => error.code === 'observe-requires-v2'), describeErrors(v1.errors));
+});
+
 test('schema: known-bad samples are rejected at the offending path', () => {
   const samples = [
     ['unknown top-level key', { extra: true }, 'extra', 'unknown-key'],

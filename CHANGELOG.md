@@ -37,6 +37,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   and `entryId`, plus every hit in `reasons[]` (at most 8).
 - A secret that was seen anywhere in the call keeps the R3 payload shape (hash only, no stored text) even when
   a stricter rule wins the ranking.
+- `selfProtect` accepts `observe` under `version: 2` as a development truce: edits to the gate's own source are
+  recorded instead of carded. `off` and `allow` remain rejected — the switch a protected file could turn off is
+  not a gate — and this is not a mode to ship in.
 
 ## [1.4.0] - 2026-11-15
 

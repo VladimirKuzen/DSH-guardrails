@@ -698,5 +698,23 @@
     },
     "expect": { "decision": "review", "rule": "R1", "exitCode": 2 },
     "note": "apply_patch has no path argument; the targets are read out of the patch text"
+  },
+  {
+    "id": "v2-self-protect-observe",
+    "tool": "write",
+    "args": { "file_path": "D:\\work\\vendor\\dsh-guardrails\\rules.js", "content": "// developing" },
+    "policy": {
+      "version": 2,
+      "enabled": true,
+      "rules": {
+        "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
+        "selfProtect": { "mode": "observe", "paths": ["D:\\work\\vendor\\dsh-guardrails"] },
+        "destructive": { "mode": "ask" },
+        "secrets": { "mode": "ask" }
+      }
+    },
+    "expect": { "decision": "allow", "exitCode": 0 },
+    "v2Only": true,
+    "note": "development truce: self-protection records the write and lets it through, without a card"
   }
 ]

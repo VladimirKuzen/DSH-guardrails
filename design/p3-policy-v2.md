@@ -297,11 +297,14 @@ observe 命中 R3 时，payload 必须先脱敏再落盘：
 
 ### 3.5 能否被 policy 关掉
 
-**待拍板（§10 第 1 条）。** 默认建议：`selfProtect.mode` 只接受 `ask | deny`，**不接受 `off`**。
+**已定（§10.1）：`selfProtect.mode` 只接受 `ask | deny`，不接受 `off` 与 `allow`。**
+**2026-11-17 追加：`version: 2` 下追加接受 `observe`**，作为开发期临时约定——改护栏自身源码不弹卡，只记 `observed`，
+改完可回看；发布前必须改回 `ask`（`dsh-guardrails/policy.schema.json` 的 `selfProtect.mode` enum、
+`lib/policy/validate.js` 的 `self-protect-not-disableable` 与 `observe-requires-v2` 是三道门）。
 
 理由：一个能被“它保护的那个文件”关掉的开关，不是护栏。agent 只要说服用户批准一次 `policy.json` 编辑，重启后自保护就没了。想彻底关，改代码或加环境变量，属于显式运维动作，且会留痕。
 
-若用户选择允许 `off`，则必须配：每次 `off` 生效时写一条显式告警事件 + 卡片文案明说“本次已关闭护栏自保护”。
+若将来允许 `off`，则必须配：每次 `off` 生效时写一条显式告警事件 + 卡片文案明说“本次已关闭护栏自保护”。
 
 ---
 
@@ -545,6 +548,7 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 | 自保护能否被 `policy.json` 关掉 | **只能收紧**：接受 `ask`/`deny`，不接受 `off`/`allow` | 能被它保护的那个文件关掉的开关不算护栏。`off` 语义仍保留给内置的 R1home / R2 / R3 三块（m00385） |
 | `entries` 是否允许 `mode: "allow"` | **允许，但强制收窄条件**：`when` 非空且至少一个条件；裸 allow 由 schema 拒绝 | 不给 allow 就只能用 quiet 那套硬编码极窄规则；给了则多一个配置级放宽面，所以用 schema 卡住裸 allow（§2.2-3、风险 14）（m00385） |
 | observe 记什么事件 | **新增第六个事件 `observed`** | 复用 `allowed` + `observe:true` 会让每个读日志的人都要记得过滤；新增事件成本近零（`lib/audit/v2.js:5-10` 不校验取值、`tools/audit-report.mjs` 通用遍历）（m00385） |
+| 自保护在开发期能否只记录 | **允许 `observe`（仅 `version: 2`）**，仍拒绝 `off` / `allow` | 开发期自保护会拦我们自己的手脚；observe 恰好能留"本来会弹几次卡"的样本。这不是发布档位，1.5.0 收口前要改回 `ask`（m01689、m02113） |
 
 ---
 

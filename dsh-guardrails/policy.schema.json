@@ -81,7 +81,7 @@
           "additionalProperties": false,
           "required": ["mode"],
           "properties": {
-            "mode": { "type": "string", "enum": ["ask", "deny"] },
+            "mode": { "type": "string", "enum": ["ask", "deny", "observe"] },
             "paths": { "type": "array", "items": { "type": "string", "minLength": 1 } }
           }
         }

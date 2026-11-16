@@ -24,11 +24,13 @@ Each rule can be switched to `deny` (refuse outright) or `off`. The critical tie
 the file behaves exactly as it always has: `allow` is treated as `ask` and `observe` is rejected at load
 time (`observe-requires-v2`), so a policy cannot change meaning by accident.
 
-Self-protection (`rules.selfProtect`) is the one rule whose mode accepts only `ask` or `deny`: a switch
-that the file it protects could turn off is not a gate. It covers the plugin directory the host actually
-loaded, so editing `rules.js` or `lib/` through a tool raises a card. It is **not a sandbox**: hand edits,
-other processes, an `fs` write inside the plugin itself, and `apply_patch` calls whose arguments carry only
-patch text all bypass it.
+Self-protection (`rules.selfProtect`) accepts only `ask`, `deny` and — under `"version": 2` — `observe`:
+`off` and `allow` are rejected, because a switch that the file it protects could turn off is not a gate. The
+`observe` setting is a development truce: edits to the gate are recorded (`observed`) instead of carded, so a
+change can be made and reviewed afterwards, but it is not a mode to ship with. It covers the plugin directory
+the host actually loaded, so editing `rules.js` or `lib/` through a tool raises a card. It is **not a sandbox**:
+hand edits, other processes, an `fs` write inside the plugin itself, and `apply_patch` calls whose arguments
+carry only patch text all bypass it.
 
 ## Dry run before an unreadable delete (P1.8)
 
