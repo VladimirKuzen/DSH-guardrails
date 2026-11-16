@@ -43,9 +43,11 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 - Shell writes to a protected path are caught even when the path reaches the write verb through a variable or a
   later statement: the same-statement rule missed two real `policy.json` writes on 2026-11-17 (no audit record at
   all, only the sandbox approval). `WriteAllText` and friends now count as write verbs too.
-- A protected path in program position is no longer read as a write target: `& "…\.dsh\…\node.exe" x.mjs;
-  Set-Content out.txt` used to card and call node.exe the object being written (five such cards on 2026-11-17).
-  The card also stops naming a program as the target.
+- A protected path counts only as the operand of a write verb: the check parses statements, finds each write verb,
+  and resolves its own arguments (a literal path, or a variable assigned one earlier). A path that merely appears
+  in the command is no longer a target, so `& "…\.dsh\…\node.exe" x.mjs; Set-Content out.txt` and
+  `Get-Content .dsh\…; Set-Content $env:TEMP\out` stop carding, and the card stops naming a program as the object
+  being written (five such cards on 2026-11-17). The `±400`-character window that produced them is gone.
 
 - `dsh-guardrails check` (also `node tools/check.mjs`) answers "would this call be stopped?" with an exit
   code — `0` allowed, `2` would be carded, `3` refused, `1` usage or policy error — through the same engine and

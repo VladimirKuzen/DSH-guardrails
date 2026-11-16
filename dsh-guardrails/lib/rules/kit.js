@@ -139,96 +139,112 @@ export function isUnder(path, roots) {
   return roots.some((root) => root !== '' && (path === root || path.startsWith(`${root}\\`)));
 }
 
-/** Indices of every path-like `.dsh` / `.agents` mention (absolute paths and $env: forms). */
-function homeMentionIndices(command) {
-  const indices = [];
-  const re = /(^|[\\/'"=\s])\.(dsh|agents)(?=[\\/])/gi;
-  let match;
-  while ((match = re.exec(command)) !== null) indices.push(match.index + match[1].length);
-  return indices;
-}
+/** Path-like token heads: drive paths, UNC, `~/`, `$env:NAME/`, `%NAME%/`. */
+const PATHISH = /(?:[A-Za-z]:\\|\\\\|~[\\/]|\$env:[A-Za-z_][A-Za-z0-9_]*[\\/]|%[A-Za-z_][A-Za-z0-9_]*%[\\/])[^"'\r\n;|)]*/g;
 
-/** How far a write verb may sit from a path mention and still count as "near". Kept finite so a
- *  long script cannot drag two unrelated halves together. */
-const NEAR_CHARS = 400;
+/** `$name` references inside a verb's operand span. */
+const VAR_REF = /\$([A-Za-z_][A-Za-z0-9_]*)/g;
 
-/**
- * True when a write verb sits within NEAR_CHARS of `index`.
- *
- * Statement boundaries are deliberately NOT respected: the shape a real edit takes is
- * `$p = Join-Path $env:USERPROFILE '.dsh\guardrails\policy.json'; …; Set-Content $p`, where the
- * path and the verb live in different statements, and a statement-limited check misses it — as it
- * missed two real writes on 2026-11-17 (audit shows no record at all, only the sandbox approval).
- */
-function nearWrite(command, index) {
-  return WRITE_VERBS.test(command.slice(Math.max(0, index - NEAR_CHARS), index + NEAR_CHARS));
-}
-
-/** Launch words that put the next token in program position: it is executed, not written. */
-const LAUNCHERS = /(?:^|[\s'"])(?:start-process|start|cmd\s*\/c|powershell|pwsh|call)\s*$/i;
-
-/** Start of the whitespace/quote-delimited token that contains `index`. */
-function tokenStart(command, index) {
-  let at = index;
-  while (at > 0 && !/[\s'"`=;|&(){},]/.test(command[at - 1])) at -= 1;
-  return at;
-}
-
-/**
- * True when the path at `index` is the program being run, not something written to.
- *
- * The ±NEAR_CHARS window made `& '…\.dsh\…\node.exe' script.mjs; Set-Content x` look like a write
- * to node.exe — five false cards between 01:13 and 01:20 on 2026-11-17 (audit shows `kind:
- * 'protected'`, `target: node.exe`). A path in program position is never the target of whatever
- * write verb happens to sit nearby.
- */
-export function isProgramMention(command, index) {
-  const text = str(command);
-  const start = tokenStart(text, index);
-  const head = text.slice(Math.max(0, start - 200), start);
-  const cut = Math.max(
-    head.lastIndexOf(';'),
-    head.lastIndexOf('|'),
-    head.lastIndexOf('&'),
-    head.lastIndexOf('('),
-    head.lastIndexOf('{'),
-    head.lastIndexOf('\n'),
-  );
-  const between = head.slice(cut + 1).replace(/^[\s@]+/, '').replace(/[\s'"]+$/, '');
-  if (between === '') return true;
-  return LAUNCHERS.test(between);
-}
-
-/** R1 only fires when a write verb sits near a home path mention (see `nearWrite`). */
-export function mentionsHomeNearWrite(command) {
-  for (const index of homeMentionIndices(command)) {
-    if (isProgramMention(command, index)) continue;
-    if (nearWrite(command, index)) return true;
+function unquote(text) {
+  const trimmed = str(text).trim();
+  const quote = trimmed[0];
+  if ((quote === '"' || quote === "'") && trimmed.length > 1 && trimmed[trimmed.length - 1] === quote) {
+    return trimmed.slice(1, -1);
   }
-  return false;
+  return trimmed;
 }
 
-/** After a root mention, the path must end or hit a separator — otherwise `dsh-guardrails2` would match `dsh-guardrails`. */
-const ROOT_TAIL = /^(?:$|[\\/"'\s);,|>])/;
+/**
+ * Statements: `;`, `&&`, `||` and a newline end one. A pipe does not — `Get-ChildItem X | Remove-Item`
+ * is one statement whose write consumes what the left side produced.
+ */
+export function statementsOf(command) {
+  return str(command)
+    .split(/;|\r?\n|&&|\|\|/)
+    .map((statement) => statement.trim())
+    .filter((statement) => statement !== '');
+}
+
+/** Variables assigned a literal path, including `Join-Path <base> '<rel>'`. Names are lower-cased. */
+export function assignmentsOf(command) {
+  const vars = new Map();
+  const re = /\$([A-Za-z_][A-Za-z0-9_]*)\s*=\s*([^;\r\n|]+)/g;
+  let match;
+  while ((match = re.exec(str(command))) !== null) {
+    const name = match[1].toLowerCase();
+    if (vars.has(name)) continue;
+    const value = match[2].trim();
+    const join = /^join-path\s+(.+)$/i.exec(value);
+    if (join !== null) {
+      const parts = join[1].match(/"[^"]*"|'[^']*'|\S+/g) ?? [];
+      if (parts.length >= 2) vars.set(name, `${unquote(parts[0]).replace(/[\\/]+$/, '')}\\${unquote(parts[1])}`);
+      else if (parts.length === 1) vars.set(name, unquote(parts[0]));
+      continue;
+    }
+    vars.set(name, unquote(value));
+  }
+  return vars;
+}
+
+/** Paths a statement hands to a write verb: its operands, or — for a pipeline — what the left side named. */
+function targetsOf(statement, vars) {
+  const out = [];
+  const verb = new RegExp(WRITE_VERBS.source, 'gi');
+  let match;
+  while ((match = verb.exec(statement)) !== null) {
+    const span = statement.slice(match.index + match[0].length, match.index + match[0].length + 200);
+    let found = false;
+    for (const run of span.match(new RegExp(PATHISH.source, 'g')) ?? []) {
+      // One operand run can hold several paths (`Copy-Item A B`), and it ends at a PowerShell
+      // parameter: `D:\work\vendor -Recurse` is the directory, not a file called "-Recurse".
+      for (const piece of run.split(/\s+(?=(?:[A-Za-z]:\\|\\\\|~[\\/]|\$env:[A-Za-z_]))/)) {
+        const raw = piece.replace(/\s+-[\w-]+.*$/, '').trim();
+        if (raw !== '') {
+          out.push(raw);
+          found = true;
+        }
+      }
+    }
+    for (const ref of span.matchAll(new RegExp(VAR_REF.source, 'g'))) {
+      const value = vars.get(ref[1].toLowerCase());
+      if (value !== undefined && value !== '') {
+        out.push(value);
+        found = true;
+      }
+    }
+    if (!found) for (const path of statement.match(new RegExp(PATHISH.source, 'g')) ?? []) out.push(path);
+  }
+  return out;
+}
 
 /**
- * Same shape as mentionsHomeNearWrite, for arbitrary normalized roots.
- * 自保护用：任意受保护根（已由 expandPath 归一为小写、反斜杠）出现在命令里，且 400 字符内
- * 有写动词就命中——不要求同一语句，因为 `$p = '…'; …; Set-Content $p` 这种变量转手是常态。
+ * First path a command writes that sits under `roots`, or `''`.
+ *
+ * R1 used to fire on "a protected path anywhere within 400 characters of a write verb". That missed
+ * a real `policy.json` write (path in one statement, verb in another — 2026-11-17) and then carded
+ * commands that only *ran* the bundled node while writing a temp file. The window is gone: a hit now
+ * means a write verb's own operand resolves under a protected root, where an operand may be a
+ * literal path or a variable assigned one earlier in the command.
  */
-export function mentionsPathNearWrite(command, roots) {
-  const lower = str(command).toLowerCase();
-  for (const root of roots) {
-    if (root === '') continue;
-    let at = lower.indexOf(root);
-    while (at >= 0) {
-      if (ROOT_TAIL.test(lower.slice(at + root.length))
-        && !isProgramMention(lower, at)
-        && nearWrite(lower, at)) return true;
-      at = lower.indexOf(root, at + 1);
+export function writtenPathUnder(command, roots, env = {}) {
+  const vars = assignmentsOf(command);
+  for (const statement of statementsOf(command)) {
+    for (const raw of targetsOf(statement, vars)) {
+      if (isUnder(expandPath(raw, env, env?.CWD), roots)) return raw;
     }
   }
-  return false;
+  return '';
+}
+
+/** True when a write verb's operand resolves under a DSH-home root. */
+export function mentionsHomeNearWrite(command, env = {}, roots = ['~/.dsh', '~/.agents']) {
+  const expanded = roots.map((root) => expandPath(root, env)).filter(Boolean);
+  return writtenPathUnder(command, expanded, env) !== '';
+}
+
+/** Same shape as mentionsHomeNearWrite, for arbitrary normalized roots (self-protection). */
+export function mentionsPathNearWrite(command, roots, env = {}) {
+  return writtenPathUnder(command, roots, env) !== '';
 }
 
 /** Map a matched secret to its stable label id. */

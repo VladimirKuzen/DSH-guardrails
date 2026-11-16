@@ -74,6 +74,36 @@ test('R1: 执行 ~/.dsh 下的程序不算写入它', () => {
   }
 });
 
+test('R1: 路径存进变量再执行、写动词写的是别处，也不算写入', () => {
+  // 真实形状（2026-11-17 01:30 又踩了一次）：节点路径在赋值语句，& $node 执行它，
+  // Set-Content 写的是 TEMP 下的文件。
+  const command = [
+    '$node = "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe"',
+    '& $node -e "console.log(1)"',
+    '$out = "C:\\work\\o.txt"',
+    'Set-Content -LiteralPath $out -Value x',
+  ].join('\n');
+  assert.equal(evaluate(policy, call('pwsh', { command }), env), null);
+});
+
+test('R1: 读 ~/.dsh 里的文件、写别处，不算写 home', () => {
+  // 真实误报（2026-11-17 01:30）：先 Get-Content 读 loaded.json，再 Set-Content 写 TEMP。
+  const command = [
+    'Get-Content -LiteralPath "$env:USERPROFILE\\.dsh\\guardrails\\loaded.json" | Out-String',
+    '$out = "$env:TEMP\\probe.txt"',
+    'Set-Content -LiteralPath $out -Value "x"',
+  ].join('\n');
+  assert.equal(evaluate(policy, call('pwsh', { command }), env), null);
+});
+
+test('R1: 变量既被执行也被写，仍然拦', () => {
+  const command = [
+    '$p = "$env:USERPROFILE\\.dsh\\guardrails\\policy.json"',
+    'Set-Content -LiteralPath $p -Value "{}"',
+  ].join('\n');
+  assert.equal(rules(evaluate(policy, call('pwsh', { command }), env)), 'R1');
+});
+
 test('R1: 写 ~/.dsh 下的文件仍然拦（程序位例外不放大）', () => {
   const verdict = evaluate(policy, call('pwsh', {
     command: 'Remove-Item -LiteralPath "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe" -Force',

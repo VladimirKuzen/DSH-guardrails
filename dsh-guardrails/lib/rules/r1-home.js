@@ -53,7 +53,7 @@ export function evaluateR1(call, rule = {}, env, opts = {}) {
 
   if (SHELL_TOOLS.has(name)) {
     const command = str(args.command ?? args.cmd ?? args.script);
-    if (mentionsHomeNearWrite(command)) {
+    if (mentionsHomeNearWrite(command, env, roots)) {
       return {
         rule: 'R1',
         mode,

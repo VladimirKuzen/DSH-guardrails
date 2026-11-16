@@ -20,10 +20,13 @@ Each rule can be switched to `deny` (refuse outright) or `off`. The critical tie
 `rules.critical.mode: "ask"` (downgrade to an approval card with a ⛔ prefix) or `"off"` (plain R2).
 `rules.critical.failClosed` (default `true`) keeps that tier refused when rule evaluation itself throws.
 
-A protected path only counts when it is something the command **writes**: a path in program position
-(`& "…\.dsh\…\node.exe" script.mjs`, `Start-Process …`) is being run, not written, so the nearby
-`Set-Content` in the same line does not turn it into a target — and the card never names a program as
-the thing about to be overwritten.
+A protected path only counts when it is the **operand of a write verb**. The check reads the command as
+statements, finds each write verb (`Set-Content`, `Remove-Item`, `WriteAllText`, `>`, …) inside its
+statement, and resolves that verb's own arguments — a literal path, or a variable assigned one earlier
+in the same command (`$p = Join-Path $env:USERPROFILE '.dsh\guardrails\policy.json'; Set-Content $p`).
+A path that merely appears somewhere in the command is not a target: running the bundled node
+(`& "…\.dsh\…\node.exe" script.mjs`), or reading a file with `Get-Content`, does not make the nearby
+`Set-Content` write to it, so the card never names a program as the thing about to be overwritten.
 
 `observe` and `allow` are the P3 additions, and they only exist under `"version": 2`. Under `version: 1`
 the file behaves exactly as it always has: `allow` is treated as `ask` and `observe` is rejected at load

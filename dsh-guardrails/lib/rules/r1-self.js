@@ -121,7 +121,7 @@ export function evaluateR1Self(call, rule = {}, env, opts = {}) {
 
   if (SHELL_TOOLS.has(name)) {
     const command = str(args.command ?? args.cmd ?? args.script);
-    if (mentionsPathNearWrite(command, roots)) {
+    if (mentionsPathNearWrite(command, roots, env)) {
       return {
         rule: 'R1',
         sub: 'self',

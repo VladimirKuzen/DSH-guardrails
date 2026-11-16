@@ -221,16 +221,17 @@ test('facts: R1 shell reports the protected path, not the -Path flag', () => {
 
 test('facts: a program under the protected root is not reported as the target', () => {
   // 2026-11-17: `& '…\.dsh\…\node.exe' x.mjs; Set-Content out.txt` was described as a write to
-  // node.exe. A path in program position is executed, never written.
-  const facts = factsOf({
-    name: 'pwsh',
-    arguments: {
-      command:
-        '& "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe" "C:\\work\\x.mjs"; Set-Content -LiteralPath "C:\\work\\out.txt" -Value x',
-    },
-  }, { rule: 'R1', mode: 'ask' });
-  assert.notEqual(facts.kind, 'protected');
-  assert.notEqual(facts.target, 'C:\\Users\\Tester\\.dsh\\dsh-runtimes\\node.exe');
+  // node.exe. A path in program position is executed, never written. The same holds when the path
+  // reaches the call through a variable.
+  const verdict = { rule: 'R1', mode: 'ask' };
+  for (const command of [
+    '& "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe" "C:\\work\\x.mjs"; Set-Content -LiteralPath "C:\\work\\out.txt" -Value x',
+    '$node = "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe"\n& $node "C:\\work\\x.mjs"\nSet-Content -LiteralPath "C:\\work\\out.txt" -Value x',
+  ]) {
+    const facts = factsOf({ name: 'pwsh', arguments: { command } }, verdict);
+    assert.notEqual(facts.kind, 'protected', command);
+    assert.notEqual(facts.target, 'C:\\Users\\Tester\\.dsh\\dsh-runtimes\\node.exe', command);
+  }
 });
 
 test('facts: the card describes the worst action, not the first one', () => {

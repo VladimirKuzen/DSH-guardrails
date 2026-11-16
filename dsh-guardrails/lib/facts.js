@@ -12,7 +12,7 @@
 import { readdirSync, statSync } from 'node:fs';
 
 import { expandPath } from '../rules.js';
-import { isProgramMention } from './rules/kit.js';
+import { writtenPathUnder } from './rules/kit.js';
 
 const PATH_TOOLS = new Set(['write', 'edit', 'create_file', 'apply_patch']);
 const SHELL_TOOLS = new Set(['pwsh', 'bash']);
@@ -206,22 +206,17 @@ export function worstActionStatement(command) {
 /**
  * First path under DSH's home that a command actually writes, displayed.
  *
- * A `.dsh` path in program position is a path being run (the bundled node, a script under the
- * runtime), never the object of the nearby write verb: `& '…\.dsh\…\node.exe' x.mjs; Set-Content
- * out.txt` must not describe node.exe as the target.
+ * Only the operands of write verbs count. A `.dsh` path that merely sits in the command — the
+ * bundled node being run, or a `Get-Content` source — is not what the write verb touches:
+ * `$node = '…\.dsh\…\node.exe'; & $node x.mjs; Set-Content out.txt` must not describe node.exe as
+ * the target (five cards on 2026-11-17 said exactly that).
  */
 export function protectedPath(command, env) {
-  const text = str(command);
-  for (const pattern of [PROTECTED_ABS, PROTECTED_VAR]) {
-    const global = new RegExp(pattern.source, `${pattern.flags.replace(/g/g, '')}g`);
-    let match;
-    while ((match = global.exec(text)) !== null) {
-      if (isProgramMention(text, match.index)) continue;
-      const shown = displayPath(match[0], env);
-      return isUnresolved(shown) ? '' : shown;
-    }
-  }
-  return '';
+  const roots = ['~/.dsh', '~/.agents'].map((root) => expandPath(root, env)).filter(Boolean);
+  const raw = writtenPathUnder(command, roots, env);
+  if (raw === '') return '';
+  const shown = displayPath(raw, env);
+  return isUnresolved(shown) ? '' : shown;
 }
 
 /** Classify the action from the tool name and its arguments. */
