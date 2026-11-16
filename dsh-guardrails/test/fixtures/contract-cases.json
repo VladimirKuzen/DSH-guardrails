@@ -600,7 +600,7 @@
         "secrets": { "mode": "ask" }
       }
     },
-    "expect": { "decision": "allow", "exitCode": 0 },
+    "expect": { "decision": "allow", "exitCode": 0, "mode": "observe" },
     "v2Only": true,
     "note": "observe records and lets the call through; it is a P3 mode"
   },
@@ -713,7 +713,7 @@
         "secrets": { "mode": "ask" }
       }
     },
-    "expect": { "decision": "allow", "exitCode": 0 },
+    "expect": { "decision": "allow", "exitCode": 0, "mode": "observe" },
     "v2Only": true,
     "note": "development truce: self-protection records the write and lets it through, without a card"
   }

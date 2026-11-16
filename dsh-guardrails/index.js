@@ -35,9 +35,9 @@ import { join } from 'node:path';
 
 import { criticalFallback, evaluate } from './rules.js';
 import { SHELL_TOOLS } from './lib/rules/kit.js';
-import { selfRoots, assertSelfRoot } from './lib/rules/r1-self.js';
+import { assertSelfRoot } from './lib/rules/r1-self.js';
 import { describeErrors, errorSignature, validatePolicy } from './lib/policy/validate.js';
-import { decideQuiet } from './lib/rules/quiet.js';
+import { applyWorkspaceQuiet, factRoots } from './lib/finalize.js';
 import { dryRunMessage, dryRunRequirement, fingerprint } from './lib/dry-run.js';
 import { collectFacts } from './lib/facts.js';
 import { describe } from './lib/describe.js';
@@ -49,7 +49,7 @@ export const inject = ['tools'];
 /** Single source of truth for the heartbeat version. */
 const VERSION = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf8')).version;
 
-const DEFAULTS = {
+export const DEFAULTS = {
   enabled: true,
   audit: { format: 'v2', maxPayloadBytes: 64 * 1024 },
   rules: {
@@ -86,19 +86,7 @@ function envForRules() {
   };
 }
 
-/** Deep merge: matching keys in the file override defaults; missing keys keep theirs. */
-function merge(base, override) {
-  if (override === null || typeof override !== 'object' || Array.isArray(override)) {
-    return override === undefined ? base : override;
-  }
-  const out = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    out[key] = key in base && base[key] !== null && typeof base[key] === 'object' && !Array.isArray(base[key])
-      ? merge(base[key], value)
-      : value;
-  }
-  return out;
-}
+import { merge } from './lib/policy/merge.js';
 
 function readPolicyFile(path) {
   try {
@@ -404,14 +392,7 @@ export function apply(ctx, config = {}) {
     let facts = null;
     let displayReason;
     try {
-      const homeRoots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
-      // Self-protection roots join the fact roots so `facts.protectedHit` (and
-      // the card copy) sees them; without this the copy says "DSH home" for the
-      // gate's own source.
-      const roots = [...new Set([
-        ...homeRoots,
-        ...selfRoots(policy.rules?.selfProtect ?? {}, envForRules()),
-      ])];
+      const roots = factRoots(policy, envForRules());
       const factsEnv = { ...process.env, ...envForRules(), CWD: resolveCwd(exec).cwd ?? '' };
       facts = collectFacts(exec, verdict, factsEnv, { roots });
     } catch {
@@ -419,39 +400,32 @@ export function apply(ctx, config = {}) {
     }
 
     // P1.7 workspace quiet: only turns an ordinary "clean up a temp file" ask
-    // into an allow. R1, R3, critical and every other R2 hit are untouched.
-    // In v2 the winner can be R2 while a stricter band also matched (it would
-    // have won instead), so quiet additionally needs every reason to be an
-    // ordinary R2 and no secret anywhere in the call.
-    const onlyOrdinaryR2 = verdict.reasons === undefined
-      || verdict.reasons.every((reason) => reason.rule === 'R2' && reason.severity === undefined);
-    if (verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined
-      && onlyOrdinaryR2 && verdict.secretHit !== true) {
-      const quietConfig = policy.rules?.destructive?.workspaceQuiet;
-      const decision = decideQuiet({
-        tool: exec?.name,
-        command: exec?.arguments?.command,
-        facts,
-        config: quietConfig,
-        cwd: resolveCwd(exec).cwd,
-      });
-      if (decision.quiet) {
-        verdict = { ...verdict, mode: 'allow', quiet: 'workspace' };
-      } else if (decision.reason === 'config-invalid' || decision.reason === 'cwd-mismatch') {
-        // Misconfiguration disables quiet globally; report it once per process.
-        if (!quietWarned.has(decision.reason) && usesV2()) {
-          quietWarned.add(decision.reason);
-          try {
-            auditLog().append({
-              id: randomUUID(),
-              event: 'config-invalid',
-              ts: new Date().toISOString(),
-              tool: exec?.name ?? null,
-              reason: decision.reason,
-            });
-          } catch {
-            // A failed audit write must not break the tool chain
-          }
+    // into an allow. The decision itself lives in `lib/finalize.js` so the CLI
+    // and the contract runner cannot drift from the host.
+    const quieted = applyWorkspaceQuiet({
+      policy,
+      call: exec,
+      verdict,
+      facts,
+      cwd: resolveCwd(exec).cwd,
+    });
+    verdict = quieted.verdict;
+    const quietDecision = quieted.decision;
+    if (quietDecision !== null && !quietDecision.quiet
+      && (quietDecision.reason === 'config-invalid' || quietDecision.reason === 'cwd-mismatch')) {
+      // Misconfiguration disables quiet globally; report it once per process.
+      if (!quietWarned.has(quietDecision.reason) && usesV2()) {
+        quietWarned.add(quietDecision.reason);
+        try {
+          auditLog().append({
+            id: randomUUID(),
+            event: 'config-invalid',
+            ts: new Date().toISOString(),
+            tool: exec?.name ?? null,
+            reason: quietDecision.reason,
+          });
+        } catch {
+          // A failed audit write must not break the tool chain
         }
       }
     }

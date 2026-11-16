@@ -33,6 +33,13 @@
   漏掉了 2026-11-17 两次真实的 `policy.json` 写入（审计里一条记录都没有，只有沙箱审批）。`WriteAllText` 一类
   也补进了写动词。
 
+- `dsh-guardrails check`（也可 `node tools/check.mjs`）用退出码回答“这次调用会不会被拦”：`0` 放行、
+  `2` 会弹卡、`3` 拒绝、`1` 用法或策略错误；走的是宿主同一个引擎和同一段静默判定。`--args -` 从标准输入
+  读参数（PowerShell 会弄坏内联 JSON），`--cwd` 设定相对路径基准，`--json` 输出赢家与 `reasons[]`。
+  不写审计：它只是提问，不是执行。
+- “工作区静默放行”的判定挪进 `lib/finalize.js`，宿主、契约 runner 与 CLI 共用，三处不会再各写一遍而漂移。
+- `test/engine-v2.test.mjs` 原先没接进 `npm test` 的测试链，现已接上；CLI 作为第二个 runner 重放整张契约表。
+
 ## [1.4.0] - 2026-11-15
 
 - 可选的工作区静默（`rules.destructive.workspaceQuiet`，默认关闭）：shell 调用只删除或移动一个目标、

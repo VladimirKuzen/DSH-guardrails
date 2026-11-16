@@ -131,6 +131,27 @@ Under `version: 1` only the first bullet exists: `allow` is treated as `ask` and
 load time, so the old files keep their old behaviour. `entries.allow` is never a way to whitelist a false
 positive — it ranks below every built-in `ask`/`deny`/`observe`.
 
+## Checking a call from the command line (P3)
+
+`dsh-guardrails check` (or `node tools/check.mjs`) puts one tool call through the same engine the host uses
+and answers with an exit code:
+
+    node tools/check.mjs --tool pwsh --args '{"command":"git reset --hard"}'
+
+Exit codes: `0` allowed (including `observe` and the workspace quiet), `2` would be shown for approval, `3`
+refused, `1` usage or policy error — `1` never means "allowed", so a script cannot mistake a typo for a
+permission. Add `--json` for `{decision, exitCode, winner, reasons, facts, cwd}`; `winner.mode` is what
+tells an `observe` apart from a plain allow.
+
+- `--args -` reads the arguments from stdin. On Windows this is the reliable form: PowerShell splits and
+  re-quotes inline JSON, so `--args "{...}"` can arrive mangled.
+- `--cwd <path>` decides relative paths. Only the CLI defaults to the current directory; the host never
+  trusts `process.cwd()` for a tool call.
+- The CLI writes no audit records and does not touch the heartbeat: it is a question, not a call.
+
+An invalid policy file is an error here (exit 1) instead of a silent fallback: a one-shot question has no
+last good policy to keep, and the host's "keep the previous policy" behaviour would hide the typo.
+
 ## What you get afterwards
 
 - **Audit**: `~/.dsh/guardrails/audit/v2/` — `requested` / `delivered` / `outcome` / `executed` records,

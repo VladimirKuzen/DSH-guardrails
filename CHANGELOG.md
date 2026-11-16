@@ -44,6 +44,16 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   later statement: the same-statement rule missed two real `policy.json` writes on 2026-11-17 (no audit record at
   all, only the sandbox approval). `WriteAllText` and friends now count as write verbs too.
 
+- `dsh-guardrails check` (also `node tools/check.mjs`) answers "would this call be stopped?" with an exit
+  code — `0` allowed, `2` would be carded, `3` refused, `1` usage or policy error — through the same engine and
+  the same quiet step the host uses. `--args -` reads the arguments from stdin (PowerShell mangles inline
+  JSON), `--cwd` sets the base for relative paths, `--json` prints the winner plus `reasons[]`. It writes no
+  audit records: it is a question, not a call.
+- The workspace-quiet decision moved into `lib/finalize.js`, shared by the host, the contract runner and the
+  CLI, so those three cannot drift apart again.
+- `test/engine-v2.test.mjs` was missing from the `npm test` chain; its 17 tests are wired in now, and the CLI
+  replays the whole contract table as a second runner.
+
 ## [1.4.0] - 2026-11-15
 
 - Optional workspace quiet (`rules.destructive.workspaceQuiet`, off by default): a shell call that deletes

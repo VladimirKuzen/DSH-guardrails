@@ -424,7 +424,7 @@ Get-Content args.json -Raw | & $node dsh-guardrails/tools/check.mjs --tool pwsh 
 | 1 | 契约表 + `test/contract.test.mjs`（只测现状，含 `knownGap`）**（已完成 2026-11-16，见 §5.4）** | 先把今天的行为钉死，后面每步都能证明“没变” | 删文件 |
 | 2 | `lib/rules/r1-self.js` 自保护 + 合并 roots 文案 + `policy.schema.json` / `validate.js` / 启动校验 **（已完成 2026-11-16，见 §7.1）** | 小而加性；先于引擎重构落地 | 还原两个文件 + 重启 |
 | 3 | 引擎 v2（收集 + rank + `reasons[]` + entries + observe），`version:1` 完全走老路径 **（已完成 2026-11-17，见 §7.2）** | 最大一块，前面已有护栏 | 还原 `rules.js` + 重启 |
-| 4 | `tools/check.mjs` + `test/cli.test.mjs` + `bin` | 依赖第 3 步的返回值形状 | 删文件 |
+| 4 | `tools/check.mjs` + `test/cli.test.mjs` + `bin` **（已完成 2026-11-17，见 §7.3）** | 依赖第 3 步的返回值形状 | 删文件 |
 | 5 | 文档：本文转正、`docs/threat-model.md` 补“非沙箱”与已知绕过、`design/p3-handoff.md` §6 加指针 | 计划 §6.2 第三条是文档交付项 | 还原 md |
 
 版本与 tag：全部完成后 `package.json` 升 **1.5.0**，打 `v1.5.0` + `p3`（annotated，写清验收日期）；每步一个小提交，消息写“改了什么、为什么”。`design/p3-handoff.md` §0 的版本/提交/tag 快照在收口时一并更新。
@@ -491,6 +491,31 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 1. **R3 的 `allow` 只在非 shell 生效**：`rules.secrets.mode = "allow"` 下，`write` 里含 token 也放行并记 `allowed`；但 shell 命令仍被钳成 `deny`（`modeForV2`），因为卡片正文会回显 `args.command`。这条钳制不因配置让步。
 2. **`observe` 事件只属于 v2**：`version: 1` 出现 `observe` 直接 `observe-requires-v2`（v1 里它会被夹成 ask，静默改变语义）。
 3. **`entries` 的 `cwd` 必须归一化**：`when.cwdUnder` 用 `expandPath(env.CWD)` 后的串做 `isUnder` 比较，按路径段而不是字符串前缀（`proj2` 不会被 `proj` 命中）——首版忘了归一化，测试立刻抓到。
+
+### 7.3 第 ④ 步落地状态（2026-11-17）
+
+新增 / 改动（全部在 `dsh-guardrails/`）：
+
+| 文件 | 改动 |
+|---|---|
+| `tools/check.mjs`（新） | 参数 `--tool` / `--args`（`-` 读 stdin）/ `--policy` / `--cwd` / `--json` / `--validate` / `--help`；位置参数 `check` 兼容 `dsh-guardrails check`；导出 `run(argv, io)` 供测试直接调用（`stdout`/`stderr`/`stdin`/`env` 注入） |
+| `lib/finalize.js`（新） | `factRoots(policy, env)` 和 `applyWorkspaceQuiet({ policy, call, verdict, facts, cwd })`：把“普通 R2 ask 降成工作区静默放行”这段判定从 `index.js` 抽出来，宿主、契约 runner、CLI 三处共用 |
+| `lib/policy/merge.js`（新） | 把 `index.js` 里的 `merge()` 挪出来，CLI 与宿主用同一份合并规则 |
+| `index.js` | 改为调用 `factRoots` / `applyWorkspaceQuiet`；`DEFAULTS` 改为 `export`（CLI 复用同一份默认策略）；删除本地 `merge` |
+| `test/cli.test.mjs`（新，77 条） | 表里除 `io` 那一条外全部用例各跑一遍 CLI，断言 `decision` + `exitCode`（+ 可选 `winner.mode`）；另加 8 条 CLI 自身契约：坏参数、未知参数、缺 `--tool`、`--validate` 好/坏、无效策略不当默认值、`--args -`、缺策略文件回退默认值 |
+| `test/contract.test.mjs` / 契约表 | 新增可选 `expect.mode`（只允许 `observe`，且决策必须是 `allow`）；两条 observe 用例登记；表自检同步 |
+| `package.json` | 加 `"bin": { "dsh-guardrails": "./tools/check.mjs" }`；测试链补 `test/cli.test.mjs`，并补回**漏掉的 `test/engine-v2.test.mjs`** |
+
+实现中确定的四条：
+
+1. **决策词只有三个**（`allow` / `review` / `block`），`observe` 算 `allow`（退出码 0）。要区分两者看 `winner.mode`，契约表用可选的 `expect.mode` 钉住——否则一条 `observe` 静默变成普通 allow（记录消失）不会有测试发现。
+2. **无效策略在 CLI 里是错误（退出码 1），不静默回退**：宿主的“保留上一份好策略”对常驻进程是对的，对一次性提问会把拼写错误藏起来。
+3. **`--cwd` 只属于 CLI**：只有它允许用 `process.cwd()` 兜底；宿主对工具调用从不这样猜目录。
+4. **`env` 是测试注入点，不是命令行开关**：契约表按虚构用户主目录（`C:\Users\Tester`）回放，CLI 需要同样的环境；做成 flag 就等于让一次调用假装跑在别人的机器上。
+
+实测：**14 个文件 353 条全绿**（rules 29、facts 25、describe 17、replay 3、critical 15、audit 11、quiet 19、dry-run 10、self-protect 21、policy-schema 9、engine-v2 17、contract 70、cli 77、smoke 30）。CLI 的唯一跳过是 `quiet-enabled-eligible`（表用 `io` 伪造文件存在，CLI 走真实文件系统，跳过原因写在 runner 里并由一条自检钉住“只能跳这一条”）。
+
+**过程中发现的一个真问题**：`test/engine-v2.test.mjs` 从来没进过 `package.json` 的测试链——17 条 v2 测试写了、跑过，但 `npm test` 不跑。这类“存在但没接上”的测试比没有更糟，因为它让人以为被覆盖了。
 
 ---
 

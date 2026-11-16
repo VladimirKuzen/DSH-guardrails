@@ -116,6 +116,24 @@
 `version: 1` 下只有第一条可用：`allow` 被当作 `ask`、`observe` 加载即拒，旧文件保持旧行为。
 `entries.allow` 从来不是"给误拦开白"的手段——它排在所有内置 `ask`/`deny`/`observe` 之后。
 
+## 从命令行问一句（P3）
+
+`dsh-guardrails check`（或 `node tools/check.mjs`）把一次工具调用送进宿主用的同一个引擎，用退出码回答：
+
+    node tools/check.mjs --tool pwsh --args '{"command":"git reset --hard"}'
+
+退出码：`0` 放行（含 `observe` 与工作区静默放行）、`2` 会弹审批卡、`3` 拒绝、`1` 用法或策略错误——
+`1` 永远不表示"放行"，脚本不会把打错的参数当成许可。加 `--json` 得到
+`{decision, exitCode, winner, reasons, facts, cwd}`；想区分 `observe` 和普通放行，看 `winner.mode`。
+
+- `--args -` 从标准输入读参数。Windows 上这是可靠写法：PowerShell 会拆分并重新加引号，内联 JSON 可能
+  传到 CLI 时已经变形。
+- `--cwd <path>` 决定相对路径的基准。只有 CLI 默认用当前目录；宿主从不拿 `process.cwd()` 当工具调用的目录。
+- CLI 不写审计、不刷心跳：它只是提问，不是执行。
+
+策略文件无效时这里直接报错（退出码 1），不做静默回退：一次性的提问没有"上一份好策略"可留，而宿主那种
+"保留上一份"的行为会把拼写错误藏起来。
+
 ## 装上之后
 
 - **审计**：`~/.dsh/guardrails/audit/v2/`——`requested` / `delivered` / `outcome` / `executed` 事件流，

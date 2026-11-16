@@ -132,6 +132,12 @@ test('contract table: every case is well formed', () => {
       assert.equal(typeof tc.expect.rule, 'string', `${tc.id}: a gated case needs a rule id`);
     }
     assert.ok(!(tc.knownGap && tc.v2Only), `${tc.id}: a case cannot be both knownGap and v2Only`);
+    if (tc.expect.mode !== undefined) {
+      // `observe` is a boundary allow; the mode assertion is what keeps it from
+      // silently becoming a plain allow (which would erase the audit record).
+      assert.equal(decision, 'allow', `${tc.id}: only an allow can carry expect.mode`);
+      assert.equal(tc.expect.mode, 'observe', `${tc.id}: the only mode worth asserting is observe`);
+    }
   }
 });
 
@@ -162,6 +168,9 @@ for (const tc of CASES) {
         tc.expect.severity,
         `${tc.id}: expected severity ${tc.expect.severity}, got ${verdict?.severity}`,
       );
+    }
+    if (tc.expect.mode !== undefined) {
+      assert.equal(verdict?.mode, tc.expect.mode, `${tc.id}: expected winner mode ${tc.expect.mode}, got ${verdict?.mode}`);
     }
     if (tc.expect.quiet !== undefined) {
       assert.equal(verdict?.quiet, tc.expect.quiet, `${tc.id}: expected quiet ${tc.expect.quiet}`);
