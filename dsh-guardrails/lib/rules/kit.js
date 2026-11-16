@@ -11,7 +11,7 @@
 import { criticalVerdict } from '../critical.js';
 
 /** Shell verbs that write to or delete from the file system. The `>` branch must not match `=>`, `->` or `>>`. */
-const WRITE_VERBS = /\b(set-content|add-content|copy-item|move-item|remove-item|new-item|out-file|rename-item|clear-content|robocopy|cp|mv|rm|ri|del|erase|rd|ren|mkdir|tee)\b|(?<![=<>-])>(?!>)\s*[A-Za-z"$%]/i;
+const WRITE_VERBS = /\b(set-content|add-content|copy-item|move-item|remove-item|new-item|out-file|rename-item|clear-content|robocopy|cp|mv|rm|ri|del|erase|rd|ren|mkdir|tee|writealltext|writeallbytes|writealllines|appendalltext|writefilesync|createfile)\b|(?<![=<>-])>(?!>)\s*[A-Za-z"$%]/i;
 
 /** Destructive verbs: the default list, extendable from policy. Short aliases must sit in command position so ordinary text is not flagged. */
 export const DEFAULT_DESTRUCTIVE = [
@@ -148,27 +148,26 @@ function homeMentionIndices(command) {
   return indices;
 }
 
-/** True when a write verb sits in the same statement as `index` (same line or pipe segment). */
-function segmentNearWrite(command, index) {
-  const start = Math.max(
-    command.lastIndexOf('\n', index),
-    command.lastIndexOf(';', index),
-    command.lastIndexOf('|', index),
-    command.lastIndexOf('&', index),
-  );
-  let end = command.length;
-  for (const ch of ['\n', ';', '|', '&']) {
-    const at = command.indexOf(ch, index);
-    if (at >= 0) end = Math.min(end, at);
-  }
-  const segment = command.slice(start + 1, end);
-  return segment.length <= 400 && WRITE_VERBS.test(segment);
+/** How far a write verb may sit from a path mention and still count as "near". Kept finite so a
+ *  long script cannot drag two unrelated halves together. */
+const NEAR_CHARS = 400;
+
+/**
+ * True when a write verb sits within NEAR_CHARS of `index`.
+ *
+ * Statement boundaries are deliberately NOT respected: the shape a real edit takes is
+ * `$p = Join-Path $env:USERPROFILE '.dsh\guardrails\policy.json'; …; Set-Content $p`, where the
+ * path and the verb live in different statements, and a statement-limited check misses it — as it
+ * missed two real writes on 2026-11-17 (audit shows no record at all, only the sandbox approval).
+ */
+function nearWrite(command, index) {
+  return WRITE_VERBS.test(command.slice(Math.max(0, index - NEAR_CHARS), index + NEAR_CHARS));
 }
 
-/** R1 only fires when a write verb and a home path sit in the same statement (same line or pipe segment). */
+/** R1 only fires when a write verb sits near a home path mention (see `nearWrite`). */
 export function mentionsHomeNearWrite(command) {
   for (const index of homeMentionIndices(command)) {
-    if (segmentNearWrite(command, index)) return true;
+    if (nearWrite(command, index)) return true;
   }
   return false;
 }
@@ -178,7 +177,8 @@ const ROOT_TAIL = /^(?:$|[\\/"'\s);,|>])/;
 
 /**
  * Same shape as mentionsHomeNearWrite, for arbitrary normalized roots.
- * 自保护用：任意受保护根（已由 expandPath 归一为小写、反斜杠）出现在同一语句里且有写动词。
+ * 自保护用：任意受保护根（已由 expandPath 归一为小写、反斜杠）出现在命令里，且 400 字符内
+ * 有写动词就命中——不要求同一语句，因为 `$p = '…'; …; Set-Content $p` 这种变量转手是常态。
  */
 export function mentionsPathNearWrite(command, roots) {
   const lower = str(command).toLowerCase();
@@ -186,7 +186,7 @@ export function mentionsPathNearWrite(command, roots) {
     if (root === '') continue;
     let at = lower.indexOf(root);
     while (at >= 0) {
-      if (ROOT_TAIL.test(lower.slice(at + root.length)) && segmentNearWrite(lower, at)) return true;
+      if (ROOT_TAIL.test(lower.slice(at + root.length)) && nearWrite(lower, at)) return true;
       at = lower.indexOf(root, at + 1);
     }
   }

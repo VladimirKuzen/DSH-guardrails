@@ -56,6 +56,21 @@ test('R1: shell 写入 .dsh 会拦', () => {
   assert.equal(rules(verdict), 'R1');
 });
 
+test('R1: 路径经变量转手、写动词在另一条语句里也会拦', () => {
+  // 2026-11-17 真实漏掉的形状：路径在赋值语句，Set-Content 在后面的语句。
+  const verdict = evaluate(policy, call('pwsh', {
+    command: '$p = Join-Path $env:USERPROFILE ".dsh\\guardrails\\policy.json"; $o = "{}"; Set-Content -LiteralPath $p -Value $o',
+  }), env);
+  assert.equal(rules(verdict), 'R1');
+});
+
+test('R1: File::WriteAllText 也算写动词', () => {
+  const verdict = evaluate(policy, call('pwsh', {
+    command: '$p = "$env:USERPROFILE\\.dsh\\guardrails\\policy.json"; [System.IO.File]::WriteAllText($p, "{}")',
+  }), env);
+  assert.equal(rules(verdict), 'R1');
+});
+
 test('R1: plugin_manager 一律拦', () => {
   assert.equal(rules(evaluate(policy, call('plugin_manager', { action: 'list_bundles' }), env)), 'R1');
 });

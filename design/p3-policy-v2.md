@@ -283,7 +283,8 @@ observe 命中 R3 时，payload 必须先脱敏再落盘：
 ### 3.3 匹配形状（三条，全部复用现有判定）
 
 1. **`PATH_TOOLS` 写入受保护根**：`pathOf(args)` → `expandPath` → `isUnder(target, roots)`。沿用 `dsh-guardrails/lib/rules/r1-home.js:42-51`。
-2. **shell 命令**：同一语句内出现受保护路径 + 写动词。现有 `dsh-guardrails/lib/rules/kit.js:145-162` 的 `mentionsHomeNearWrite` 是 `.dsh/.agents` 专用正则，需泛化成 `mentionsPathNearWrite(command, root, WRITE_VERBS)`：把“路径提及”换成对每个根做字符串包含判断（根已小写归一），保留“同语句”与 `segment.length <= 400` 的约束。**`WRITE_VERBS` 不动**，扩它会把误报面放大到不可控。
+2. **shell 命令**：路径出现 + 写动词在 400 字符内。现有 `dsh-guardrails/lib/rules/kit.js` 的 `mentionsHomeNearWrite` 是 `.dsh/.agents` 专用正则，已泛化成 `mentionsPathNearWrite(command, roots)`：把“路径提及”换成对每个根做字符串包含判断（根已小写归一）。
+   **2026-11-17 修正（实测）**：原先要求“同一语句”，结果两次真实的 `policy.json` 写入（`$p = Join-Path … '.dsh\…'; …; Set-Content $p`）**一条审计记录都没有**——路径在赋值语句、写动词在后面，语句边界正好切断了匹配。现改为“400 字符窗口内”，并给 `WRITE_VERBS` 补了 `writealltext|writeallbytes|writealllines|appendalltext|writefilesync|createfile`（`[System.IO.File]::WriteAllText` 原来根本不算写动词）。代价是“顺带提一句 `~/.dsh`、400 字符内又有写动词”的命令会多一张卡；R1 是 ask 档，这个代价可以接受。
 3. **`plugin_manager`**：已在 `alwaysAskTools`（`dsh-guardrails/lib/rules/r1-home.js:31-40`），安装/升级/卸载自动弹卡。
 
 命中后 `facts.protectedHit = true`（`dsh-guardrails/lib/describe.js:93` → `seg.protected`），卡片文案说明“这是护栏自身源码，不是 DSH 家目录”。为此 `dsh-guardrails/index.js:334` 传给 `collectFacts` 的 `roots` 必须合并成全集（home + self），否则文案层看不到自保护命中。

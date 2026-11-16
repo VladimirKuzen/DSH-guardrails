@@ -40,6 +40,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 - `selfProtect` accepts `observe` under `version: 2` as a development truce: edits to the gate's own source are
   recorded instead of carded. `off` and `allow` remain rejected — the switch a protected file could turn off is
   not a gate — and this is not a mode to ship in.
+- Shell writes to a protected path are caught even when the path reaches the write verb through a variable or a
+  later statement: the same-statement rule missed two real `policy.json` writes on 2026-11-17 (no audit record at
+  all, only the sandbox approval). `WriteAllText` and friends now count as write verbs too.
 
 ## [1.4.0] - 2026-11-15
 

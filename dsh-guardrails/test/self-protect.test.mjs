@@ -61,6 +61,23 @@ test('self: reading the plugin source is not a hit', () => {
   }), env), null);
 });
 
+test('self: a path carried by a variable still asks', () => {
+  // 真实形状：路径在赋值语句里，写动词在后面的语句里，第一次修 policy.json 就是这么漏的。
+  const verdict = evaluate(policy({ mode: 'ask', paths: [] }), call('pwsh', {
+    command: `$src = '${root}\\rules.js'; $text = 'x'; Set-Content -LiteralPath $src -Value $text`,
+  }), env);
+  assert.equal(verdict?.rule, 'R1');
+  assert.equal(verdict?.sub, 'self');
+});
+
+test('self: File::WriteAllText into the plugin source asks', () => {
+  const verdict = evaluate(policy({ mode: 'ask', paths: [] }), call('pwsh', {
+    command: `$f = '${root}\\rules.js'; [System.IO.File]::WriteAllText($f, 'x')`,
+  }), env);
+  assert.equal(verdict?.rule, 'R1');
+  assert.equal(verdict?.sub, 'self');
+});
+
 test('self: writing next to the plugin, not into it, is not a hit', () => {
   assert.equal(evaluate(policy({ mode: 'ask', paths: [] }), call('write', {
     file_path: 'D:\\work\\notes.md',
