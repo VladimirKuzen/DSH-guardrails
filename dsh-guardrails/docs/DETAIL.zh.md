@@ -19,6 +19,10 @@
 设成 `ask`（降级为带 ⛔ 的审批卡）或 `off`（退回普通 R2）；`rules.critical.failClosed`（默认开）
 让这一层在判定本身抛异常时仍然保持拒绝。
 
+受保护路径只有在命令**要写它**时才计数：出现在"程序位"的路径（`& "…\.dsh\…\node.exe" x.mjs`、
+`Start-Process …`）是被执行的，不是被写的，所以同一行里附近的 `Set-Content` 不会把它变成目标——
+卡片也不会再把一个程序说成"即将被覆盖的对象"。
+
 `observe` 与 `allow` 是 P3 新增的档位，只在 `"version": 2` 下存在。`version: 1` 的文件行为与从前完全一致：
 `allow` 仍被当作 `ask`、`observe` 在加载时直接拒绝（`observe-requires-v2`），所以旧配置不会因为升级而悄悄改变含义。
 

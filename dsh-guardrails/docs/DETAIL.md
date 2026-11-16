@@ -20,6 +20,11 @@ Each rule can be switched to `deny` (refuse outright) or `off`. The critical tie
 `rules.critical.mode: "ask"` (downgrade to an approval card with a ⛔ prefix) or `"off"` (plain R2).
 `rules.critical.failClosed` (default `true`) keeps that tier refused when rule evaluation itself throws.
 
+A protected path only counts when it is something the command **writes**: a path in program position
+(`& "…\.dsh\…\node.exe" script.mjs`, `Start-Process …`) is being run, not written, so the nearby
+`Set-Content` in the same line does not turn it into a target — and the card never names a program as
+the thing about to be overwritten.
+
 `observe` and `allow` are the P3 additions, and they only exist under `"version": 2`. Under `version: 1`
 the file behaves exactly as it always has: `allow` is treated as `ask` and `observe` is rejected at load
 time (`observe-requires-v2`), so a policy cannot change meaning by accident.
