@@ -12,6 +12,7 @@
 import { readdirSync, statSync } from 'node:fs';
 
 import { expandPath } from '../rules.js';
+import { isProgramMention } from './rules/kit.js';
 
 const PATH_TOOLS = new Set(['write', 'edit', 'create_file', 'apply_patch']);
 const SHELL_TOOLS = new Set(['pwsh', 'bash']);
@@ -202,13 +203,25 @@ export function worstActionStatement(command) {
   return { statement: worst.statement, kind: worst.kind };
 }
 
-/** First path under DSH's home mentioned by a command, displayed. */
+/**
+ * First path under DSH's home that a command actually writes, displayed.
+ *
+ * A `.dsh` path in program position is a path being run (the bundled node, a script under the
+ * runtime), never the object of the nearby write verb: `& '…\.dsh\…\node.exe' x.mjs; Set-Content
+ * out.txt` must not describe node.exe as the target.
+ */
 export function protectedPath(command, env) {
   const text = str(command);
-  const match = PROTECTED_ABS.exec(text) ?? PROTECTED_VAR.exec(text);
-  if (match === null) return '';
-  const shown = displayPath(match[0], env);
-  return isUnresolved(shown) ? '' : shown;
+  for (const pattern of [PROTECTED_ABS, PROTECTED_VAR]) {
+    const global = new RegExp(pattern.source, `${pattern.flags.replace(/g/g, '')}g`);
+    let match;
+    while ((match = global.exec(text)) !== null) {
+      if (isProgramMention(text, match.index)) continue;
+      const shown = displayPath(match[0], env);
+      return isUnresolved(shown) ? '' : shown;
+    }
+  }
+  return '';
 }
 
 /** Classify the action from the tool name and its arguments. */

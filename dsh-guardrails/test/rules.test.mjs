@@ -64,6 +64,23 @@ test('R1: 路径经变量转手、写动词在另一条语句里也会拦', () =
   assert.equal(rules(verdict), 'R1');
 });
 
+test('R1: 执行 ~/.dsh 下的程序不算写入它', () => {
+  // 2026-11-17 的误报：命令行里出现 bundled node 的绝对路径，附近的 Set-Content 在写别处。
+  for (const command of [
+    '& "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe" "C:\\work\\x.mjs"; Set-Content -LiteralPath "C:\\work\\out.txt" -Value x',
+    'Start-Process "$env:USERPROFILE\\.dsh\\tools\\probe.exe"; Set-Content -LiteralPath "C:\\work\\o.txt" -Value x',
+  ]) {
+    assert.equal(evaluate(policy, call('pwsh', { command }), env), null, command);
+  }
+});
+
+test('R1: 写 ~/.dsh 下的文件仍然拦（程序位例外不放大）', () => {
+  const verdict = evaluate(policy, call('pwsh', {
+    command: 'Remove-Item -LiteralPath "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe" -Force',
+  }), env);
+  assert.equal(rules(verdict), 'R1');
+});
+
 test('R1: File::WriteAllText 也算写动词', () => {
   const verdict = evaluate(policy, call('pwsh', {
     command: '$p = "$env:USERPROFILE\\.dsh\\guardrails\\policy.json"; [System.IO.File]::WriteAllText($p, "{}")',

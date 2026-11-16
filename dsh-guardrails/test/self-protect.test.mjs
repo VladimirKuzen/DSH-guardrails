@@ -92,6 +92,13 @@ test('self: a sibling directory sharing the prefix is not a hit', () => {
   }), env), null);
 });
 
+test('self: running a file from the plugin is not a write to it', () => {
+  // 程序位例外：`& "<root>\run.mjs"` 是执行，不是写入；旁边的 Set-Content 写的是别处。
+  assert.equal(evaluate(policy({ mode: 'ask', paths: [] }), call('pwsh', {
+    command: `& "${root}\\test\\check.mjs"; Set-Content -LiteralPath "C:\\work\\out.txt" -Value x`,
+  }), env), null);
+});
+
 test('self: deny refuses instead of asking', () => {
   const verdict = evaluate(policy({ mode: 'deny', paths: [] }), call('write', {
     file_path: `${root}\\index.js`,

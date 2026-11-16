@@ -164,9 +164,45 @@ function nearWrite(command, index) {
   return WRITE_VERBS.test(command.slice(Math.max(0, index - NEAR_CHARS), index + NEAR_CHARS));
 }
 
+/** Launch words that put the next token in program position: it is executed, not written. */
+const LAUNCHERS = /(?:^|[\s'"])(?:start-process|start|cmd\s*\/c|powershell|pwsh|call)\s*$/i;
+
+/** Start of the whitespace/quote-delimited token that contains `index`. */
+function tokenStart(command, index) {
+  let at = index;
+  while (at > 0 && !/[\s'"`=;|&(){},]/.test(command[at - 1])) at -= 1;
+  return at;
+}
+
+/**
+ * True when the path at `index` is the program being run, not something written to.
+ *
+ * The ±NEAR_CHARS window made `& '…\.dsh\…\node.exe' script.mjs; Set-Content x` look like a write
+ * to node.exe — five false cards between 01:13 and 01:20 on 2026-11-17 (audit shows `kind:
+ * 'protected'`, `target: node.exe`). A path in program position is never the target of whatever
+ * write verb happens to sit nearby.
+ */
+export function isProgramMention(command, index) {
+  const text = str(command);
+  const start = tokenStart(text, index);
+  const head = text.slice(Math.max(0, start - 200), start);
+  const cut = Math.max(
+    head.lastIndexOf(';'),
+    head.lastIndexOf('|'),
+    head.lastIndexOf('&'),
+    head.lastIndexOf('('),
+    head.lastIndexOf('{'),
+    head.lastIndexOf('\n'),
+  );
+  const between = head.slice(cut + 1).replace(/^[\s@]+/, '').replace(/[\s'"]+$/, '');
+  if (between === '') return true;
+  return LAUNCHERS.test(between);
+}
+
 /** R1 only fires when a write verb sits near a home path mention (see `nearWrite`). */
 export function mentionsHomeNearWrite(command) {
   for (const index of homeMentionIndices(command)) {
+    if (isProgramMention(command, index)) continue;
     if (nearWrite(command, index)) return true;
   }
   return false;
@@ -186,7 +222,9 @@ export function mentionsPathNearWrite(command, roots) {
     if (root === '') continue;
     let at = lower.indexOf(root);
     while (at >= 0) {
-      if (ROOT_TAIL.test(lower.slice(at + root.length)) && nearWrite(lower, at)) return true;
+      if (ROOT_TAIL.test(lower.slice(at + root.length))
+        && !isProgramMention(lower, at)
+        && nearWrite(lower, at)) return true;
       at = lower.indexOf(root, at + 1);
     }
   }

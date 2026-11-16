@@ -42,8 +42,7 @@ test('facts: writing an existing file reports overwrite', () => {
 
 test('facts: writing a new file reports create', () => {
   const facts = factsOf({ name: 'write', arguments: { file_path: 'C:\\work\\new.txt' } });
-  assert.equal(facts.kind, 'create');
-  assert.equal(facts.exists, undefined);
+  assert.equal(facts.kind, 'create');  assert.equal(facts.exists, undefined);
   assert.equal(facts.count, undefined);
   assert.equal(facts.reversible, 'yes');
 });
@@ -218,6 +217,20 @@ test('facts: R1 shell reports the protected path, not the -Path flag', () => {
   assert.equal(facts.kind, 'protected');
   assert.equal(facts.target, 'C:\\Users\\Tester\\.dsh\\AGENTS.md');
   assert.equal(facts.protectedHit, true);
+});
+
+test('facts: a program under the protected root is not reported as the target', () => {
+  // 2026-11-17: `& '…\.dsh\…\node.exe' x.mjs; Set-Content out.txt` was described as a write to
+  // node.exe. A path in program position is executed, never written.
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: {
+      command:
+        '& "$env:USERPROFILE\\.dsh\\dsh-runtimes\\node.exe" "C:\\work\\x.mjs"; Set-Content -LiteralPath "C:\\work\\out.txt" -Value x',
+    },
+  }, { rule: 'R1', mode: 'ask' });
+  assert.notEqual(facts.kind, 'protected');
+  assert.notEqual(facts.target, 'C:\\Users\\Tester\\.dsh\\dsh-runtimes\\node.exe');
 });
 
 test('facts: the card describes the worst action, not the first one', () => {
