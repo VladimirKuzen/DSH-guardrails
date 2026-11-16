@@ -187,6 +187,14 @@ test('a corrupt policy keeps the last good copy', async () => {
   assert.deepEqual(decision, { kind: 'allow' });
 });
 
+test('a policy saved with a UTF-8 BOM still loads', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit'), rules: { destructive: { mode: 'deny' } } });
+  writeFileSync(policyPath, `\uFEFF${readFileSync(policyPath, 'utf8')}`, 'utf8');
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(call('pwsh', { command: 'Remove-Item -Recurse D:\\work\\dist' }, 'cbom'), next);
+  assert.equal(decision.kind, 'deny', 'a BOM must not turn the whole policy into a parse failure');
+});
+
 test('critical deny logs severity', async () => {
   writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
   const ctx = fakeCtx();

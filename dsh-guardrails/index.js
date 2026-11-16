@@ -102,7 +102,11 @@ function merge(base, override) {
 
 function readPolicyFile(path) {
   try {
-    return JSON.parse(readFileSync(path, 'utf8'));
+    // PowerShell's `Set-Content -Encoding UTF8` writes a BOM, and `JSON.parse`
+    // dies on it. A policy edited that way must take effect, not silently fall
+    // back to the defaults while the file looks correct in an editor.
+    const text = readFileSync(path, 'utf8');
+    return JSON.parse(text.charCodeAt(0) === 0xfeff ? text.slice(1) : text);
   } catch (error) {
     if (error?.code === 'ENOENT') return null;
     throw error;
