@@ -2,10 +2,12 @@
  * Red-line evaluation. Pure: no file system access, no events, easy to unit test.
  * 红线判定。纯函数：不碰文件系统、不发事件，方便单测。
  *
- * Precedence, in order: R3 secrets -> R1 DSH's own home -> R2 critical -> R2 destructive.
- * 判定顺序：R3 密钥 -> R1 DSH 自身目录 -> R2c 系统级硬停 -> R2 破坏性操作。
+ * Precedence, in order: R3 secrets -> R1 DSH's own home -> R1 the gate's own
+ * source -> R2 critical -> R2 destructive.
+ * 判定顺序：R3 密钥 -> R1 DSH 自身目录 -> R1 护栏自身源码 -> R2c 系统级硬停 -> R2 破坏性操作。
  *
- *   R1 keeps DSH's own home untouched (~/.dsh, ~/.agents, its plugins and profile);
+ *   R1 keeps DSH's own home untouched (~/.dsh, ~/.agents, its plugins and profile)
+ *      and keeps the gate's own source from being edited through the gate itself;
  *   R2 asks before destructive shell operations, and refuses the critical tier;
  *   R3 keeps secrets in config files, never in the conversation.
  *
@@ -27,6 +29,7 @@ import {
   str,
 } from './lib/rules/kit.js';
 import { evaluateR1 } from './lib/rules/r1-home.js';
+import { evaluateR1Self } from './lib/rules/r1-self.js';
 import { evaluateR2 } from './lib/rules/r2-destructive.js';
 import { evaluateR3 } from './lib/rules/r3-secrets.js';
 
@@ -70,9 +73,12 @@ export function evaluate(policy, call, env) {
   const secret = evaluateR3(call, rules.secrets ?? {});
   if (secret !== null) return secret;
 
-  // ---- R1 DSH's own home
+  // ---- R1 DSH's own home, then the gate's own source (same band, home first)
   const home = evaluateR1(call, rules.protectDshHome ?? {}, env);
   if (home !== null) return home;
+
+  const self = evaluateR1Self(call, rules.selfProtect ?? {}, env);
+  if (self !== null) return self;
 
   // ---- R2 critical tier, read-only diagnostics, then destructive operations
   return evaluateR2(call, rules, env);

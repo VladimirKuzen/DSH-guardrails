@@ -11,6 +11,7 @@ process.env.DSH_HOME = join(dir, '.dsh');
 process.env.USERPROFILE = 'C:\\Users\\Tester';
 
 const { apply } = await import('../index.js');
+const { pluginRoot } = await import('../lib/rules/r1-self.js');
 
 /** Minimal ctx: records handlers by event name. */
 function fakeCtx() {
@@ -56,6 +57,23 @@ function v1Lines() {
     return [];
   }
 }
+
+test('self-protection: the record names the sub-rule and the card says protected', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const ctx = fakeCtx();
+
+  const target = join(pluginRoot(), 'rules.js');
+  const decision = await ctx.pre(call('write', { file_path: target, content: 'x' }, 'c9'), next);
+  assert.equal(decision.kind, 'ask');
+  assert.match(decision.reason, /own source/);
+
+  const [record] = auditLines();
+  assert.equal(record.rule, 'R1');
+  assert.equal(record.sub, 'self');
+  assert.equal(record.facts.protectedHit, true);
+  assert.ok(decision.displayReason.zh.includes('受保护目录'));
+});
 
 test('R1 hit returns ask and writes requested + payload', async () => {
   rmSync(join(dir, 'audit'), { recursive: true, force: true });
@@ -287,3 +305,83 @@ test('audit.format "v1" keeps the old single-file format', async () => {
   assert.equal(lines[0].rule, 'R1');
   assert.equal(existsSync(v2Dir()), false);
 });
+
+// --- P1.8: two-phase dry run ------------------------------------------------
+
+/** A call that carries a session id, so the per-session dry-run memory is testable. */
+const callAs = (sessionId, name, args, callId) => ({
+  name,
+  arguments: args,
+  agent: { session: { id: sessionId } },
+  ...(callId === undefined ? {} : { callId }),
+});
+/** A destructive command whose target the card cannot name: the dry-run trigger. */
+const OPAQUE = { command: 'Remove-Item "D:\\work\\$name" -Force' };
+
+function dryRunPolicy(extra = {}) {
+  return {
+    enabled: true,
+    auditDir: join(dir, 'audit'),
+    rules: { destructive: { dryRun: { enabled: true, ...extra } } },
+  };
+}
+
+test('dry run off by default: the first attempt goes straight to a card', async () => {
+  writePolicy({ enabled: true, auditDir: join(dir, 'audit') });
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(callAs('s-off', 'pwsh', OPAQUE), next);
+  assert.equal(decision.kind, 'ask');
+});
+
+test('dry run: the first attempt is refused with a dry-run instruction, not a card', async () => {
+  writePolicy(dryRunPolicy());
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(callAs('s-1', 'pwsh', OPAQUE), next);
+  assert.equal(decision.kind, 'deny');
+  assert.equal(decision.info.name, 'GuardrailsDryRun');
+  assert.equal(decision.info.code, 'R2');
+  assert.match(decision.reason, /dry run/);
+  assert.match(decision.reason, /read-only listing/);
+  assert.match(decision.reason, /not judged unsafe/);
+});
+
+test('dry run: the same command in the same session is carded the second time', async () => {
+  writePolicy(dryRunPolicy());
+  const ctx = fakeCtx();
+  assert.equal((await ctx.pre(callAs('s-2', 'pwsh', OPAQUE), next)).kind, 'deny');
+  const retry = await ctx.pre(callAs('s-2', 'pwsh', OPAQUE), next);
+  assert.equal(retry.kind, 'ask');
+  assert.ok(retry.displayReason.zh.includes('预演'), retry.displayReason.zh);
+  assert.ok(retry.displayReason.en.includes('dry run'), retry.displayReason.en);
+});
+
+test('dry run: a different session starts over', async () => {
+  writePolicy(dryRunPolicy());
+  const ctx = fakeCtx();
+  assert.equal((await ctx.pre(callAs('s-3a', 'pwsh', OPAQUE), next)).kind, 'deny');
+  assert.equal((await ctx.pre(callAs('s-3b', 'pwsh', OPAQUE), next)).kind, 'deny');
+});
+
+test('dry run: a differently shaped command is its own first attempt', async () => {
+  writePolicy(dryRunPolicy());
+  const ctx = fakeCtx();
+  assert.equal((await ctx.pre(callAs('s-4', 'pwsh', OPAQUE), next)).kind, 'deny');
+  const other = { command: 'Remove-Item "D:\\work\\$other" -Force' };
+  assert.equal((await ctx.pre(callAs('s-4', 'pwsh', other), next)).kind, 'deny');
+});
+
+test('dry run: the refusal is audited as a deny with facts.dryRun=required', async () => {
+  writePolicy(dryRunPolicy());
+  const ctx = fakeCtx();
+  await ctx.pre(callAs('s-5', 'pwsh', OPAQUE), next);
+  const mine = auditLines().filter((r) => r.sessionId === 's-5');
+  const requested = mine.find((r) => r.event === 'requested');
+  assert.ok(requested, JSON.stringify(mine));
+  assert.equal(requested.rule, 'R2');
+  assert.equal(requested.mode, 'deny');
+  assert.equal(requested.facts.dryRun, 'required');
+  const outcome = mine.find((r) => r.event === 'outcome');
+  assert.equal(outcome.outcome, 'denied');
+  assert.equal(outcome.source, 'guardrail');
+});
+

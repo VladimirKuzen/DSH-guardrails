@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/local/dsh-guardrails/policy.schema.json",
+  "title": "dsh-guardrails policy",
+  "description": "Policy file read from ~/.dsh/guardrails/policy.json. Every object rejects unknown keys so a typo cannot silently disable a rule.",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "$schema": { "type": "string" },
+    "version": { "type": "integer" },
+    "enabled": { "type": "boolean" },
+    "auditDir": { "type": "string", "minLength": 1 },
+    "audit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "format": { "type": "string", "enum": ["v1", "v2"] },
+        "maxPayloadBytes": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "rules": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "protectDshHome": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "roots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "alwaysAskTools": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "critical": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "failClosed": { "type": "boolean" }
+          }
+        },
+        "destructive": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "workspaceQuiet": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "roots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                "paths": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+                "alwaysAsk": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+              }
+            },
+            "dryRun": {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "enabled": { "type": "boolean" },
+                "minChars": { "type": "integer", "minimum": 40 },
+                "minStatements": { "type": "integer", "minimum": 1 },
+                "dynamicTarget": { "type": "boolean" }
+              }
+            }
+          }
+        },
+        "secrets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "selfProtect": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["mode"],
+          "properties": {
+            "mode": { "type": "string", "enum": ["ask", "deny"] },
+            "paths": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        }
+      }
+    },
+    "entries": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["id", "tool", "mode"],
+        "properties": {
+          "id": { "type": "string", "pattern": "^[a-z0-9][a-z0-9-]{1,63}$" },
+          "tool": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+          "mode": { "type": "string", "enum": ["ask", "deny", "observe", "allow"] },
+          "when": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "cwdUnder": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+              "targetUnder": { "type": "array", "minItems": 1, "items": { "type": "string", "minLength": 1 } },
+              "commandMatches": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
+      }
+    }
+  }
+}

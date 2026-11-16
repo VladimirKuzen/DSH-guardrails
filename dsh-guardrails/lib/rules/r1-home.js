@@ -40,7 +40,7 @@ export function evaluateR1(call, rule = {}, env) {
   }
 
   if (PATH_TOOLS.has(name)) {
-    const target = expandPath(pathOf(args), env);
+    const target = expandPath(pathOf(args), env, env?.CWD);
     if (isUnder(target, roots)) {
       return {
         rule: 'R1',

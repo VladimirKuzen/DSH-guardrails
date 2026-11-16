@@ -105,6 +105,7 @@ model 发起工具调用
 | `tool` | string | 工具名（`pwsh`、`write` 等） |
 | `callId` | string \| null | 工具调用 id，用于把审批事件串回来 |
 | `rule` | `R1｜R2｜R3` | 命中规则 |
+| `sub` | `self` \| 省略 | R1 带内的子规则；`self` = 护栏自身源码（P3 第 ② 步新增，未命中时省略） |
 | `severity` | `critical` \| 省略 | 系统级硬停时存在 |
 | `mode` | `ask｜deny｜allow` | 处置 |
 | `target` | string | 展示用目标，按**码点**截断 300，控制字符转义 |

@@ -31,6 +31,21 @@ const KIND_PATTERNS = [
   [/\b(?:set-content|add-content|out-file|copy-item)\b/i, 'write'],
 ];
 
+/**
+ * How bad a kind is, for choosing which action the card describes.
+ * A command that creates a directory and then deletes files is a delete.
+ */
+const KIND_RANK = new Map([
+  ['delete', 6],
+  ['registry', 5],
+  ['service', 5],
+  ['scheduled', 5],
+  ['firewall', 5],
+  ['move', 4],
+  ['write', 3],
+  ['create', 2],
+]);
+
 /** A path flag, but not the "-Path" inside "Join-Path" or "Split-Path". */
 const PATH_FLAG = /(?<![\w-])-(?:literal)?path\b\s+(?:"([^"]+)"|'([^']+)'|([^\s]+))/i;
 const QUOTED = /"([^"]+)"|'([^']+)'/g;
@@ -169,6 +184,24 @@ export function actionStatement(command) {
   return { statement: '', kind: 'unknown' };
 }
 
+/**
+ * The worst recognised action in a command, not merely the first.
+ * `New-Item …; Remove-Item …` must read as a delete: a card that names the
+ * harmless first step hides the irreversible one. Ties keep the earliest.
+ */
+export function worstActionStatement(command) {
+  let worst = { statement: '', kind: 'unknown', rank: 0 };
+  for (const statement of splitStatements(command)) {
+    for (const [pattern, kind] of KIND_PATTERNS) {
+      if (!pattern.test(statement)) continue;
+      const rank = KIND_RANK.get(kind) ?? 1;
+      if (rank > worst.rank) worst = { statement, kind, rank };
+      break;
+    }
+  }
+  return { statement: worst.statement, kind: worst.kind };
+}
+
 /** First path under DSH's home mentioned by a command, displayed. */
 export function protectedPath(command, env) {
   const text = str(command);
@@ -192,7 +225,7 @@ export function classify(call, verdict) {
 
   if (SHELL_TOOLS.has(name)) {
     const command = str(args.command ?? args.cmd ?? args.script);
-    return actionStatement(command).kind;
+    return worstActionStatement(command).kind;
   }
 
   return 'unknown';
@@ -238,7 +271,7 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
   const command = str(args.command ?? args.cmd ?? args.script);
   const shell = SHELL_TOOLS.has(name);
 
-  const action = shell ? actionStatement(command) : { statement: '', kind: '' };
+  const action = shell ? worstActionStatement(command) : { statement: '', kind: '' };
   let kind = classify(call, verdict);
   // Reserved for a future rule that gates directory creation itself. Under the
   // current rules a shell `New-Item -ItemType Directory` is only gated when it
@@ -267,7 +300,11 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
         : commandTarget(action.statement, { unix: name === 'bash' });
 
   const shown = displayPath(rawTarget, env);
-  const target = isUnresolved(shown) ? '' : shown;
+  // A target still carrying a variable cannot be named. Say so instead of
+  // silently dropping the segment: "delete, target unknown" is still a fact.
+  const unresolved = shown !== '' && isUnresolved(shown);
+  const target = unresolved ? '' : shown;
+  const dynamic = unresolved ? true : undefined;
   // A wildcard means the text names a pattern, not one key or file.
   const wildcard = /[*?]/.test(rawTarget) ? true : undefined;
   const lineCount = shell ? command.split(/\r?\n/).filter((line) => line.trim() !== '').length : 0;
@@ -309,5 +346,6 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
     secretLabel: verdict?.rule === 'R3' ? str(verdict.label) : '',
     severity: criticalCategory === '' ? undefined : 'critical',
     criticalCategory,
+    ...(dynamic === undefined ? {} : { dynamic }),
   };
 }

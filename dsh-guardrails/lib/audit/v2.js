@@ -148,6 +148,7 @@ export class AuditLog {
       tool: input.tool ?? null,
       callId: input.callId ?? null,
       rule: input.rule ?? null,
+      ...(input.sub === undefined ? {} : { sub: input.sub }),
       mode: input.mode ?? null,
       ...(input.severity === undefined ? {} : { severity: input.severity }),
       target: input.target ?? null,

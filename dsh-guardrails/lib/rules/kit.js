@@ -92,8 +92,10 @@ export function str(value) {
   return typeof value === 'string' ? value : '';
 }
 
-/** Expand ~ / %VAR% / $env:VAR to an absolute path; backslashes and case are normalized for prefix comparison. */
-export function expandPath(input, env) {
+/** Expand ~ / %VAR% / $env:VAR to an absolute path; backslashes and case are normalized for prefix comparison.
+ *  A relative path is resolved against `base` (the session cwd) when one is known — without
+ *  that, `write` with `"file_path": "lib/x.js"` would slip past every prefix check. */
+export function expandPath(input, env, base = '') {
   let p = str(input).trim().replace(/^["']|["']$/g, '');
   if (p === '') return '';
   p = p
@@ -102,6 +104,11 @@ export function expandPath(input, env) {
     .replace(/^\$([A-Za-z_][A-Za-z0-9_]*)/, (_, name) => str(env[name]))
     .replace(/^~(?=$|[\\/])/, str(env.USERPROFILE) || str(env.HOME) || '');
   p = p.replace(/\//g, '\\').replace(/\\{2,}/g, '\\');
+  const absolute = /^[a-z]:\\/i.test(p) || p.startsWith('\\\\');
+  const root = str(base).trim().replace(/\//g, '\\').replace(/\\+$/, '');
+  if (!absolute && root !== '' && /^[a-z]:\\/i.test(root)) {
+    p = `${root}\\${p.replace(/^\\+/, '')}`;
+  }
   return p.toLowerCase();
 }
 
@@ -141,22 +148,47 @@ function homeMentionIndices(command) {
   return indices;
 }
 
+/** True when a write verb sits in the same statement as `index` (same line or pipe segment). */
+function segmentNearWrite(command, index) {
+  const start = Math.max(
+    command.lastIndexOf('\n', index),
+    command.lastIndexOf(';', index),
+    command.lastIndexOf('|', index),
+    command.lastIndexOf('&', index),
+  );
+  let end = command.length;
+  for (const ch of ['\n', ';', '|', '&']) {
+    const at = command.indexOf(ch, index);
+    if (at >= 0) end = Math.min(end, at);
+  }
+  const segment = command.slice(start + 1, end);
+  return segment.length <= 400 && WRITE_VERBS.test(segment);
+}
+
 /** R1 only fires when a write verb and a home path sit in the same statement (same line or pipe segment). */
 export function mentionsHomeNearWrite(command) {
   for (const index of homeMentionIndices(command)) {
-    const start = Math.max(
-      command.lastIndexOf('\n', index),
-      command.lastIndexOf(';', index),
-      command.lastIndexOf('|', index),
-      command.lastIndexOf('&', index),
-    );
-    let end = command.length;
-    for (const ch of ['\n', ';', '|', '&']) {
-      const at = command.indexOf(ch, index);
-      if (at >= 0) end = Math.min(end, at);
+    if (segmentNearWrite(command, index)) return true;
+  }
+  return false;
+}
+
+/** After a root mention, the path must end or hit a separator — otherwise `dsh-guardrails2` would match `dsh-guardrails`. */
+const ROOT_TAIL = /^(?:$|[\\/"'\s);,|>])/;
+
+/**
+ * Same shape as mentionsHomeNearWrite, for arbitrary normalized roots.
+ * 自保护用：任意受保护根（已由 expandPath 归一为小写、反斜杠）出现在同一语句里且有写动词。
+ */
+export function mentionsPathNearWrite(command, roots) {
+  const lower = str(command).toLowerCase();
+  for (const root of roots) {
+    if (root === '') continue;
+    let at = lower.indexOf(root);
+    while (at >= 0) {
+      if (ROOT_TAIL.test(lower.slice(at + root.length)) && segmentNearWrite(lower, at)) return true;
+      at = lower.indexOf(root, at + 1);
     }
-    const segment = command.slice(start + 1, end);
-    if (segment.length <= 400 && WRITE_VERBS.test(segment)) return true;
   }
   return false;
 }

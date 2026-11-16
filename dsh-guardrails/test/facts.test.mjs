@@ -220,6 +220,39 @@ test('facts: R1 shell reports the protected path, not the -Path flag', () => {
   assert.equal(facts.protectedHit, true);
 });
 
+test('facts: the card describes the worst action, not the first one', () => {
+  // A setup step that creates a directory must not hide the delete that follows.
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: {
+      command:
+        'New-Item -ItemType Directory -Force -Path "C:\\work\\out" | Out-Null; Remove-Item -LiteralPath "C:\\work\\a.txt" -Force',
+    },
+  });
+  assert.equal(facts.kind, 'delete');
+  assert.equal(facts.target, 'C:\\work\\a.txt');
+  assert.equal(facts.reversible, 'no');
+});
+
+test('facts: a variable target stays unnamed and says so', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'Remove-Item -LiteralPath "C:\\work\\$name" -Force' },
+  });
+  assert.equal(facts.kind, 'delete');
+  assert.equal(facts.target, '');
+  assert.equal(facts.dynamic, true);
+});
+
+test('facts: a resolved target is not marked dynamic', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'Remove-Item -LiteralPath "C:\\work\\a.txt" -Force' },
+  });
+  assert.equal(facts.target, 'C:\\work\\a.txt');
+  assert.equal(facts.dynamic, undefined);
+});
+
 test('displayPath and clipPath keep the value readable', () => {
   assert.equal(displayPath('$env:USERPROFILE\\.dsh\\x', env), 'C:\\Users\\Tester\\.dsh\\x');
   assert.equal(displayPath('~/.dsh/y', env), 'C:\\Users\\Tester\\.dsh\\y');

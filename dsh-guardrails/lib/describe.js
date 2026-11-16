@@ -85,6 +85,12 @@ export function describe(verdict, facts, options = {}) {
 
     body.push(text(pack, actionKey(facts, verdict)));
     if (facts.target !== '') body.push(text(pack, 'seg.target', { path: clipPath(facts.target) }));
+    // The target is set by a variable: name what we do not know rather than
+    // omit the segment entirely, which used to read as "no target at all".
+    else if (facts.dynamic === true) {
+      // After a dry-run the listing is already in the transcript: point at it.
+      body.push(text(pack, facts.dryRun === 'retry' ? 'seg.target.listed' : 'seg.target.dynamic'));
+    }
     if (facts.kind === 'registry' && REGISTRY_SCRIPT.has(facts.registryAction)) body.push(text(pack, 'seg.registry.script'));
     if (facts.wildcard === true) body.push(text(pack, 'seg.wildcard'));
     if (facts.kind === 'overwrite') body.push(text(pack, 'seg.existed'));
@@ -96,6 +102,9 @@ export function describe(verdict, facts, options = {}) {
     // Registry adds overwrite values we cannot see; say so instead of guessing.
     else if (facts.reversible === 'unknown' && facts.kind === 'registry') body.push(text(pack, 'seg.reversible.unknown'));
     if (typeof facts.lines === 'number' && facts.lines > 3) body.push(text(pack, 'seg.lines', { count: facts.lines }));
+    // A retry after the gate asked for a dry run: the listing should be visible
+    // in the transcript above this card. Say so when it is not obvious.
+    if (facts.dryRun === 'retry') body.push(text(pack, 'seg.dryrun.retry'));
 
     rendered[locale] = `${prefix} ${body.join(SEPARATOR[locale] ?? ' ')}`.trim();
   }

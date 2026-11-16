@@ -4,6 +4,29 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
+## [Unreleased]
+
+- R1 self-protection (`rules.selfProtect`): a write, or a shell command carrying a write verb, that targets
+  the plugin's own directory (plus any extra root in `paths`) now asks before running. `apply_patch` is
+  covered as well by reading its `*** Update File:` targets out of the patch text. The mode accepts only
+  `ask` or `deny`: a switch that the file it protects could turn off is not a gate. It raises the cost of
+  editing the gate through a tool; it is not a sandbox — hand edits, other processes and an `fs` write
+  inside the plugin still bypass it.
+- Policy files are validated against `policy.schema.json` before they are merged: unknown keys (typos) are
+  rejected, `version` above 1 is refused until the v2 engine lands, and a file that fails validation is
+  ignored — the previous good policy stays live, with one `config-invalid` audit record instead of a
+  silently weakened gate.
+- The policy schema ships in the package (`files`), so an installed copy can validate too.
+- Optional dry run before an unreadable destructive command (`rules.destructive.dryRun`, off by default):
+  when the target is a variable, the command is long, or it chains several destructive steps, the first
+  attempt is refused with an instruction to list the exact paths first; the retry — same session, same
+  command shape — is carded as usual, with `dry run was requested first` on the card. It is a nudge: a
+  retry clears it and the gate cannot tell whether a listing was produced.
+- The card now names the worst destructive action in a command instead of the first one recognized:
+  `New-Item … ; Remove-Item …` reads as a delete rather than "create directory". A target set by a variable
+  is reported as such (`target set by a variable`, or `see the read-only listing above` after a dry run)
+  instead of the target segment disappearing.
+
 ## [1.4.0] - 2026-11-15
 
 - Optional workspace quiet (`rules.destructive.workspaceQuiet`, off by default): a shell call that deletes

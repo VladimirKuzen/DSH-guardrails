@@ -35,7 +35,10 @@ import { join } from 'node:path';
 
 import { criticalFallback, evaluate } from './rules.js';
 import { SHELL_TOOLS } from './lib/rules/kit.js';
+import { selfRoots, assertSelfRoot } from './lib/rules/r1-self.js';
+import { describeErrors, errorSignature, validatePolicy } from './lib/policy/validate.js';
 import { decideQuiet } from './lib/rules/quiet.js';
+import { dryRunMessage, dryRunRequirement, fingerprint } from './lib/dry-run.js';
 import { collectFacts } from './lib/facts.js';
 import { describe } from './lib/describe.js';
 import { AuditLog, escapeControl, truncateCodePoints } from './lib/audit/v2.js';
@@ -52,13 +55,20 @@ const DEFAULTS = {
   rules: {
     protectDshHome: { mode: 'ask', roots: ['~/.dsh', '~/.agents'], alwaysAskTools: ['plugin_manager'] },
     critical: { mode: 'deny', patterns: [], failClosed: true },
-    destructive: { mode: 'ask', patterns: [] },
+    destructive: {
+      mode: 'ask',
+      patterns: [],
+      dryRun: { enabled: false, minChars: 400, minStatements: 3, dynamicTarget: true },
+    },
     secrets: { mode: 'ask', patterns: [] },
+    selfProtect: { mode: 'ask', paths: [] },
   },
 };
 
 /** How long an unanswered `requested` stays in the in-memory pending table. */
 const PENDING_TTL_MS = 10 * 60 * 1000;
+/** Command shapes remembered per session before the oldest is forgotten. */
+const DRY_RUN_MEMORY = 50;
 /** `target` is presentation text; 300 code points is plenty and stays readable. */
 const MAX_TARGET = 300;
 
@@ -160,6 +170,31 @@ export function apply(ctx, config = {}) {
 
   let cache = { at: 0, mtime: -1, policy: merge(DEFAULTS, config.policy ?? {}) };
 
+  /** Policy problems already reported: one warning and one audit event per distinct problem. */
+  const policyWarned = new Set();
+
+  const reportPolicyProblem = (reason, detail) => {
+    const signature = `${reason}|${detail}`;
+    if (policyWarned.has(signature)) return;
+    policyWarned.add(signature);
+    ctx.logger?.warn?.(`guardrails: policy ${reason}: ${detail}`);
+    // Read the audit format from the cached policy: calling usesV2() here would
+    // re-enter loadPolicy.
+    if (cache.policy?.audit?.format === 'v1') return;
+    try {
+      auditLog().append({
+        id: randomUUID(),
+        event: 'config-invalid',
+        ts: new Date().toISOString(),
+        tool: null,
+        reason,
+        detail,
+      });
+    } catch {
+      // A failed audit write must not break the tool chain
+    }
+  };
+
   const loadPolicy = () => {
     const now = Date.now();
     if (now - cache.at < 2_000) return cache.policy;
@@ -172,12 +207,32 @@ export function apply(ctx, config = {}) {
       return cache.policy;
     }
     if (mtime === cache.mtime) return cache.policy;
+    let file;
     try {
-      const file = readPolicyFile(policyPath);
-      cache = { at: now, mtime, policy: merge(DEFAULTS, file ?? config.policy ?? {}) };
-    } catch {
-      // A corrupt policy file keeps the last good copy; the guard must not vanish
+      file = readPolicyFile(policyPath);
+    } catch (error) {
+      // Unreadable or unparsable: keep the last good policy and stop re-reading
+      // until the file changes again.
+      cache.mtime = mtime;
+      reportPolicyProblem('unreadable', `${policyPath}: ${error?.message ?? error}`);
+      return cache.policy;
     }
+    if (file === null) {
+      cache = { at: now, mtime, policy: merge(DEFAULTS, config.policy ?? {}) };
+      return cache.policy;
+    }
+    const report = validatePolicy(file);
+    if (!report.ok) {
+      // A policy that fails validation is not merged at all: a mistyped key must
+      // not silently disable a rule, so the previous good policy stays live.
+      cache.mtime = mtime;
+      reportPolicyProblem(
+        'config-invalid',
+        `${policyPath}: ${describeErrors(report.errors)} [${errorSignature(report.errors)}]`,
+      );
+      return cache.policy;
+    }
+    cache = { at: now, mtime, policy: merge(DEFAULTS, file) };
     return cache.policy;
   };
 
@@ -220,6 +275,8 @@ export function apply(ctx, config = {}) {
   const byApproval = new Map();
   /** Reasons already reported as config-invalid; one warning per process. */
   const quietWarned = new Set();
+  /** sessionId -> (command fingerprint -> time); a dry-run refusal is once per shape. */
+  const dryRunSeen = new Map();
 
   const forget = (entry) => {
     pending.delete(entry.callId);
@@ -257,6 +314,7 @@ export function apply(ctx, config = {}) {
     tool: exec?.name ?? '?',
     callId: exec?.callId ?? null,
     rule: verdict.rule,
+    ...(verdict.sub === undefined ? {} : { sub: verdict.sub }),
     mode: verdict.mode,
     ...(verdict.severity === undefined ? {} : { severity: verdict.severity }),
     target: auditTarget(exec, verdict),
@@ -280,7 +338,13 @@ export function apply(ctx, config = {}) {
     try {
       policy = loadPolicy();
       if (policy.enabled === false) return next();
-      verdict = evaluate(policy, { name: exec?.name, arguments: exec?.arguments }, envForRules());
+      // CWD lets the path rules resolve relative targets: `write` with
+      // "file_path": "lib/x.js" must not slip past a prefix check.
+      verdict = evaluate(
+        policy,
+        { name: exec?.name, arguments: exec?.arguments },
+        { ...envForRules(), CWD: resolveCwd(exec).cwd ?? '' },
+      );
     } catch {
       // The critical tier fails closed: if evaluation itself broke, a shell call
       // that still matches the critical matcher is refused instead of executed.
@@ -331,11 +395,18 @@ export function apply(ctx, config = {}) {
     let facts = null;
     let displayReason;
     try {
-      const roots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
-      facts = collectFacts(exec, verdict, { ...process.env, ...envForRules() }, { roots });
-      displayReason = describe(verdict, facts);
+      const homeRoots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
+      // Self-protection roots join the fact roots so `facts.protectedHit` (and
+      // the card copy) sees them; without this the copy says "DSH home" for the
+      // gate's own source.
+      const roots = [...new Set([
+        ...homeRoots,
+        ...selfRoots(policy.rules?.selfProtect ?? {}, envForRules()),
+      ])];
+      const factsEnv = { ...process.env, ...envForRules(), CWD: resolveCwd(exec).cwd ?? '' };
+      facts = collectFacts(exec, verdict, factsEnv, { roots });
     } catch {
-      displayReason = undefined;
+      facts = null;
     }
 
     // P1.7 workspace quiet: only turns an ordinary "clean up a temp file" ask
@@ -368,6 +439,41 @@ export function apply(ctx, config = {}) {
           }
         }
       }
+    }
+
+    // P1.8 dry run: a command the card cannot describe is refused once, with an
+    // instruction to enumerate its targets first. The retry gets the ordinary
+    // card, with the enumeration above it in the transcript. Memory is per
+    // session and per command shape, and lives in this process only.
+    if (verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined) {
+      const requirement = dryRunRequirement({
+        tool: exec?.name,
+        command: exec?.arguments?.command,
+        facts,
+        config: policy.rules?.destructive?.dryRun,
+      });
+      if (requirement !== null) {
+        const key = exec?.agent?.session?.id ?? 'unknown-session';
+        const id = fingerprint(exec?.name, exec?.arguments?.command);
+        const seen = dryRunSeen.get(key);
+        if (seen === undefined || !seen.has(id)) {
+          if (seen === undefined) dryRunSeen.set(key, new Map());
+          const bucket = dryRunSeen.get(key);
+          bucket.delete(id);
+          bucket.set(id, Date.now());
+          while (bucket.size > DRY_RUN_MEMORY) bucket.delete(bucket.keys().next().value);
+          facts = { ...(facts ?? {}), dryRun: 'required' };
+          verdict = { ...verdict, mode: 'deny', dryRun: 'required', reason: dryRunMessage(requirement) };
+        } else {
+          facts = { ...(facts ?? {}), dryRun: 'retry' };
+        }
+      }
+    }
+
+    try {
+      displayReason = describe(verdict, facts);
+    } catch {
+      displayReason = undefined;
     }
 
     const fields = fieldsFor(exec, verdict, facts, displayReason);
@@ -425,7 +531,11 @@ export function apply(ctx, config = {}) {
     heartbeat();
 
     if (verdict.mode === 'deny') {
-      return { kind: 'deny', reason: verdict.reason, info: { name: 'GuardrailsDenied', code: verdict.rule } };
+      return {
+        kind: 'deny',
+        reason: verdict.reason,
+        info: { name: verdict.dryRun === 'required' ? 'GuardrailsDryRun' : 'GuardrailsDenied', code: verdict.rule },
+      };
     }
 
     return {
@@ -487,6 +597,14 @@ export function apply(ctx, config = {}) {
     }
     return next();
   });
+
+  // A self-protection root that is not the plugin is worse than none: it would
+  // silently guard the wrong directory. Report it, never crash the host.
+  try {
+    assertSelfRoot();
+  } catch (error) {
+    reportPolicyProblem('self-protect-root', error?.message ?? String(error));
+  }
 
   ctx.logger?.info?.(`guardrails: policy at ${policyPath}, audit at ${auditDir()}`);
   heartbeat();

@@ -184,6 +184,37 @@ test('describe: a critical verdict uses the block prefix and its category', () =
   assert.ok(system.en.includes('system directory'));
 });
 
+test('describe: a variable target says so instead of omitting the segment', () => {
+  const text = describe({ rule: 'R2', mode: 'ask' }, {
+    kind: 'delete',
+    target: '',
+    dynamic: true,
+    exists: undefined,
+    count: undefined,
+    reversible: 'no',
+    protectedHit: false,
+    secretLabel: '',
+  });
+  assert.equal(text.zh, '⚠ 删除｜目标由变量决定，卡片无法命名｜不可恢复');
+  assert.equal(text.en, '⚠ Delete · target set by a variable, so it cannot be named here · irreversible');
+});
+
+test('describe: after a dry run the card points at the listing', () => {
+  const text = describe({ rule: 'R2', mode: 'ask' }, {
+    kind: 'delete',
+    target: '',
+    dynamic: true,
+    dryRun: 'retry',
+    reversible: 'no',
+    protectedHit: false,
+    secretLabel: '',
+  });
+  assert.ok(text.zh.includes('见上面的只读清单'), text.zh);
+  assert.ok(text.zh.includes('首次尝试已要求预演'), text.zh);
+  assert.ok(text.en.includes('see the read-only listing above'), text.en);
+  assert.ok(!text.zh.includes('新建'), text.zh);
+});
+
 test('describe: output stays single-line and within the card budget', () => {
   const text = describe({ rule: 'R2', mode: 'ask' }, deleteFacts);
   for (const value of Object.values(text)) {
