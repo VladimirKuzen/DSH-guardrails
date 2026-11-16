@@ -81,9 +81,13 @@ export function describe(verdict, facts, options = {}) {
       if (facts.tool === 'write' || facts.tool === 'edit') body.push(text(pack, 'seg.secret.writes'));
       rendered[locale] = `${prefix} ${body.join(SEPARATOR[locale] ?? ' ')}`.trim();
       continue;
+    } else if (verdict?.rule === 'E') {
+      // A user entry says what it is in words: the rule id is an audit handle,
+      // not something to put in front of a person.
+      body.push(text(pack, `action.entry.${verdict.mode ?? 'ask'}`, { id: verdict.entryId ?? '' }));
+    } else {
+      body.push(text(pack, actionKey(facts, verdict)));
     }
-
-    body.push(text(pack, actionKey(facts, verdict)));
     if (facts.target !== '') body.push(text(pack, 'seg.target', { path: clipPath(facts.target) }));
     // The target is set by a variable: name what we do not know rather than
     // omit the segment entirely, which used to read as "no target at all".

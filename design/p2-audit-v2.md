@@ -70,9 +70,10 @@ v2 用追加式事件流，一条操作可能产生多条记录，同一 `id` �
 | `delivered` | 观察到 `approval/asked` 且 `callId` 命中我们的 pending 表 | 证明"请求真的进了审批链" |
 | `outcome` | 观察到 `approval/decided`；或护栏直接 deny 时同步写 | 用户决定 / 护栏拒绝 |
 | `executed` | `tools/post-execute` 完成且结果为允许执行 | 证明"批准之后确实执行了、成功没有" |
-| `allowed` | 仅 P1.7 工作区静默命中时 | 被静音放行的操作也要可查 |
+| `allowed` | 仅 P1.7 工作区静默命中时（P3 起 `rules.*.mode = "allow"` 也写一条，带 `reasons[]`） | 被静音放行的操作也要可查 |
+| `observed` | **P3 新增**：`version: 2` 下判定为 `observe` 时，放行前写一条 | 规则还没上线时的"预演"：记下命中了什么，但不拦 |
 
-普通 `allow`（不弹卡、不静默）不写任何记录，避免把日志变成全量命令流水。
+普通 `allow`（不弹卡、不静默）不写任何记录，避免把日志变成全量命令流水。`observed` 是唯一的例外：它本身就是"什么都不做"的判定，不写就没有任何痕迹，所以即使看起来像一次普通放行，也要留一条。
 
 ### 4.2 时序
 
@@ -104,10 +105,10 @@ model 发起工具调用
 | `cwdSource` | `session｜tool｜null` | `cwd` 的来源：会话本身、shell 工具的 `workdir` 参数、或未取到 |
 | `tool` | string | 工具名（`pwsh`、`write` 等） |
 | `callId` | string \| null | 工具调用 id，用于把审批事件串回来 |
-| `rule` | `R1｜R2｜R3` | 命中规则 |
+| `rule` | `R1｜R2｜R3｜E` | 命中规则；`E` = 自定义条目（P3） |
 | `sub` | `self` \| 省略 | R1 带内的子规则；`self` = 护栏自身源码（P3 第 ② 步新增，未命中时省略） |
 | `severity` | `critical` \| 省略 | 系统级硬停时存在 |
-| `mode` | `ask｜deny｜allow` | 处置 |
+| `mode` | `ask｜deny｜observe｜allow` | 处置（`observe` 仅 P3 的 `version: 2`） |
 | `target` | string | 展示用目标，按**码点**截断 300，控制字符转义 |
 | `facts` | object | 结构化事实：`kind/action/reversible/count/paths/secretLabel/quiet` 等 |
 | `displayReason` | `{en,zh,...}` | 当时卡片文案的完整 map |
@@ -118,6 +119,10 @@ model 发起工具调用
 | `payloadTruncated` | bool | 是否只存了前缀 |
 | `prevHash` | string | 上一条的 `hash`，当天首条为 `chain.json` 的 `lastHash` 或 `"genesis"` |
 | `hash` | string | 本记录的链哈希 |
+| `entryId` | string \| 省略 | P3：命中的自定义条目 id（`rule: "E"` 时必在） |
+| `reasons` | array \| 省略 | P3：全部命中（最多 8 条），每条 `{ rule, mode, sub?, severity?, entryId? }`；只进审计，不上卡片 |
+| `secretHit` | bool \| 省略 | P3：本次调用是否命中过密钥形状；为真时 payload 走 R3 形状（不落原文），**即使赢家不是 R3** |
+| `policyVersion` | `1｜2` \| 省略 | P3：判定时用的引擎版本 |
 
 各事件额外字段：
 
@@ -125,10 +130,11 @@ model 发起工具调用
 - `delivered`：`approvalRequestId`、`deliveredAt`
 - `outcome`：`outcome`（四种之一）、`source`（`user｜guardrail`）、`approvalRequestId`（护栏拒绝时省略）
 - `executed`：`isError`、`errorCode`、`durationMs`
+- `allowed`：`quiet: "workspace"`（静默放行时）或 `mode: "allow"`（P3 配置放宽时）
+- `observed`：无额外字段；`mode: "observe"`，payload 与 `allowed` 同样落盘（密钥形状走 R3 的"只存哈希"）
 
 `cwd` 的回退顺序是 `session.cwd` → shell 工具的 `workdir` 参数 → 空。**刻意不取 `process.cwd()`**：
 那是宿主进程的启动目录（通常是安装目录），写进"当时在哪个目录"会被当成工作区误读；宁可留空。
-- `allowed`：`quiet: "workspace"`
 
 ## 5. 文件布局
 

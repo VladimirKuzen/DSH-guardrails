@@ -131,7 +131,9 @@ function summarize(exec) {
 
 /** Presentation target for the audit: code-point truncation, controls escaped. */
 function auditTarget(exec, verdict) {
-  if (verdict.rule === 'R3') {
+  // Engine v2 can let a stricter band win a call that still contained a secret:
+  // secretHit keeps the R3 shape (path only) so the value never reaches the log.
+  if (verdict.rule === 'R3' || verdict.secretHit === true) {
     const filePath = typeof exec?.arguments?.file_path === 'string' ? exec.arguments.file_path : '';
     if (filePath !== '') return truncateCodePoints(escapeControl(filePath), MAX_TARGET).text;
     return null;
@@ -144,7 +146,7 @@ function auditTarget(exec, verdict) {
 function payloadOf(exec, verdict) {
   const args = exec?.arguments ?? {};
   const text = typeof args.command === 'string' ? args.command : JSON.stringify(args, null, 2);
-  return { payload: text, secret: verdict.rule === 'R3' };
+  return { payload: text, secret: verdict.rule === 'R3' || verdict.secretHit === true };
 }
 
 export function apply(ctx, config = {}) {
@@ -315,6 +317,9 @@ export function apply(ctx, config = {}) {
     callId: exec?.callId ?? null,
     rule: verdict.rule,
     ...(verdict.sub === undefined ? {} : { sub: verdict.sub }),
+    // v2 only: which user entry fired, and every band that matched.
+    ...(verdict.entryId === undefined ? {} : { entryId: verdict.entryId }),
+    ...(verdict.reasons === undefined ? {} : { reasons: verdict.reasons }),
     mode: verdict.mode,
     ...(verdict.severity === undefined ? {} : { severity: verdict.severity }),
     target: auditTarget(exec, verdict),
@@ -411,7 +416,13 @@ export function apply(ctx, config = {}) {
 
     // P1.7 workspace quiet: only turns an ordinary "clean up a temp file" ask
     // into an allow. R1, R3, critical and every other R2 hit are untouched.
-    if (verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined) {
+    // In v2 the winner can be R2 while a stricter band also matched (it would
+    // have won instead), so quiet additionally needs every reason to be an
+    // ordinary R2 and no secret anywhere in the call.
+    const onlyOrdinaryR2 = verdict.reasons === undefined
+      || verdict.reasons.every((reason) => reason.rule === 'R2' && reason.severity === undefined);
+    if (verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined
+      && onlyOrdinaryR2 && verdict.secretHit !== true) {
       const quietConfig = policy.rules?.destructive?.workspaceQuiet;
       const decision = decideQuiet({
         tool: exec?.name,
@@ -477,6 +488,16 @@ export function apply(ctx, config = {}) {
     }
 
     const fields = fieldsFor(exec, verdict, facts, displayReason);
+
+    // Engine v2 observe: record, then let the call through. No card, no refusal.
+    // The payload still follows the R3 rule, so an observed secret is hashed only.
+    if (verdict.mode === 'observe') {
+      if (usesV2()) {
+        emit({ id: randomUUID(), event: 'observed', ...fields, ...payloadOf(exec, verdict) });
+      }
+      heartbeat();
+      return next();
+    }
 
     if (verdict.mode === 'allow') {
       if (usesV2()) {

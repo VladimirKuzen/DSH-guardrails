@@ -561,7 +561,7 @@
     },
     "expect": { "decision": "allow", "exitCode": 0 },
     "v2Only": true,
-    "note": "entries are a P3 feature; today the key is ignored"
+    "note": "entries are engine v2; allow is rank 0, so it only wins when nothing else matched"
   },
   {
     "id": "v2-entries-deny-force-push",
@@ -584,7 +584,7 @@
         }
       ]
     },
-    "expect": { "decision": "block", "exitCode": 3 },
+    "expect": { "decision": "block", "rule": "E", "exitCode": 3 },
     "v2Only": true
   },
   {

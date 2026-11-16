@@ -385,3 +385,98 @@ test('dry run: the refusal is audited as a deny with facts.dryRun=required', asy
   assert.equal(outcome.source, 'guardrail');
 });
 
+// --- P3: engine v2 ----------------------------------------------------------
+
+function v2Policy(extra = {}) {
+  return { version: 2, enabled: true, auditDir: join(dir, 'audit'), ...extra };
+}
+
+test('v2 entry deny: refusal is audited as rule E with its entryId', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy(v2Policy({
+    entries: [{ id: 'no-dist-delete', tool: ['pwsh'], mode: 'deny', when: { commandMatches: '^\\s*Remove-Item\\b' } }],
+  }));
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(callAs('sv-1', 'pwsh', { command: 'Remove-Item -Recurse D:\\work\\dist' }, 'cv1'), next);
+  assert.equal(decision.kind, 'deny');
+  assert.equal(decision.info.code, 'E');
+  const record = auditLines().find((r) => r.callId === 'cv1' && r.event === 'requested');
+  assert.ok(record, JSON.stringify(auditLines()));
+  assert.equal(record.rule, 'E');
+  assert.equal(record.entryId, 'no-dist-delete');
+  assert.ok(Array.isArray(record.reasons) && record.reasons.some((reason) => reason.rule === 'E'));
+});
+
+test('v2 entry ask: the card says the rule in words, the record keeps the id', async () => {
+  writePolicy(v2Policy({
+    entries: [{ id: 'review-npm-install', tool: ['pwsh'], mode: 'ask', when: { commandMatches: '^\\s*npm (install|ci)\\b' } }],
+  }));
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(callAs('sv-2', 'pwsh', { command: 'npm install' }, 'cv2'), next);
+  assert.equal(decision.kind, 'ask');
+  assert.match(decision.displayReason.zh, /自定义规则 review-npm-install 要求确认/);
+  assert.match(decision.displayReason.en, /Custom rule review-npm-install needs approval/);
+});
+
+test('v2 observe: the call passes, is recorded as observed, and shows no card', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy(v2Policy({ rules: { destructive: { mode: 'observe' } } }));
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(callAs('sv-3', 'pwsh', { command: 'Remove-Item -Recurse D:\\work\\dist' }, 'cv3'), next);
+  assert.equal(decision.kind, 'allow');
+  const record = auditLines().find((r) => r.callId === 'cv3');
+  assert.equal(record.event, 'observed');
+  assert.equal(record.mode, 'observe');
+  assert.equal(record.rule, 'R2');
+  assert.ok(record.payloadRef.startsWith('payload/'));
+});
+
+test('v2 observed secret: recorded, never stored', async () => {
+  writePolicy(v2Policy({ rules: { secrets: { mode: 'observe' } } }));
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(
+    callAs('sv-4', 'write', { file_path: 'D:\\work\\cfg.txt', content: 'key=sk-proj-abcdefghijklmnopqrstuvwx' }, 'cv4'),
+    next,
+  );
+  assert.equal(decision.kind, 'allow');
+  const record = auditLines().find((r) => r.callId === 'cv4');
+  assert.equal(record.event, 'observed');
+  assert.equal(record.rule, 'R3');
+  assert.equal(record.payloadRef, null);
+  assert.match(record.payloadSha256, /^[0-9a-f]{64}$/);
+});
+
+test('v2: a secret inside a denied call is hashed, never written', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy(v2Policy({ rules: { secrets: { mode: 'observe' }, destructive: { mode: 'deny' } } }));
+  const ctx = fakeCtx();
+  const token = 'sk-proj-abcdefghijklmnopqrstuvwx';
+  const decision = await ctx.pre(callAs('sv-5', 'pwsh', { command: `Remove-Item -Force D:\\work\\${token}.txt` }, 'cv5'), next);
+  assert.equal(decision.kind, 'deny');
+  const record = auditLines().find((r) => r.callId === 'cv5');
+  assert.equal(record.rule, 'R2');
+  assert.equal(record.payloadRef, null);
+  assert.match(record.payloadSha256, /^[0-9a-f]{64}$/);
+  for (const file of readdirSync(join(dir, 'audit'), { recursive: true })) {
+    const path = join(dir, 'audit', file);
+    try {
+      assert.ok(!readFileSync(path, 'utf8').includes(token), `${file} leaks the secret`);
+    } catch {
+      // directories and unreadable entries are not payloads
+    }
+  }
+});
+
+test('v2 allow mode: the call runs and is recorded as allowed', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy(v2Policy({ rules: { destructive: { mode: 'allow' } } }));
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(callAs('sv-6', 'pwsh', { command: 'Remove-Item -Recurse D:\\work\\dist' }, 'cv6'), next);
+  assert.equal(decision.kind, 'allow');
+  const record = auditLines().find((r) => r.callId === 'cv6');
+  assert.equal(record.event, 'allowed');
+  assert.equal(record.mode, 'allow');
+  assert.ok(Array.isArray(record.reasons));
+});
+
+

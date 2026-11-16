@@ -76,12 +76,15 @@ function patchTargets(args) {
  * @param {{name: string, arguments?: object, args?: object}} call
  * @param {object} rule the policy slice rules.selfProtect
  * @param {object} env shape: { USERPROFILE, HOME, DSH_HOME, AGENTS_HOME }
+ * @param {{v2?: boolean}} [opts] engine v2 additionally accepts "observe"
  * @returns {null | {rule: 'R1', sub: 'self', mode: string, reason: string}}
  */
-export function evaluateR1Self(call, rule = {}, env) {
+export function evaluateR1Self(call, rule = {}, env, opts = {}) {
   // "off" and "allow" are rejected by policy validation; a hand-written policy
   // that skips validation still cannot switch it off from here.
-  if (rule.mode !== 'ask' && rule.mode !== 'deny') return null;
+  // 「off」与「allow」被校验器拒绝；即使有人绕过校验，这里也仍不放行。
+  const allowed = opts.v2 === true ? ['ask', 'deny', 'observe'] : ['ask', 'deny'];
+  if (!allowed.includes(rule.mode)) return null;
   const mode = rule.mode;
   const name = str(call?.name);
   const args = call?.arguments ?? call?.args ?? {};

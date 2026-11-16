@@ -26,7 +26,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "mode": { "type": "string", "enum": ["ask", "deny", "observe", "off", "allow"] },
             "roots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
             "alwaysAskTools": { "type": "array", "items": { "type": "string", "minLength": 1 } }
           }
@@ -35,7 +35,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "mode": { "type": "string", "enum": ["ask", "deny", "observe", "off", "allow"] },
             "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
             "failClosed": { "type": "boolean" }
           }
@@ -44,7 +44,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "mode": { "type": "string", "enum": ["ask", "deny", "observe", "off", "allow"] },
             "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
             "workspaceQuiet": {
               "type": "object",
@@ -72,7 +72,7 @@
           "type": "object",
           "additionalProperties": false,
           "properties": {
-            "mode": { "type": "string", "enum": ["ask", "deny", "off", "allow"] },
+            "mode": { "type": "string", "enum": ["ask", "deny", "observe", "off", "allow"] },
             "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
           }
         },

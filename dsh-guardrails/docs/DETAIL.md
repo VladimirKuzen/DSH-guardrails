@@ -20,6 +20,10 @@ Each rule can be switched to `deny` (refuse outright) or `off`. The critical tie
 `rules.critical.mode: "ask"` (downgrade to an approval card with a ⛔ prefix) or `"off"` (plain R2).
 `rules.critical.failClosed` (default `true`) keeps that tier refused when rule evaluation itself throws.
 
+`observe` and `allow` are the P3 additions, and they only exist under `"version": 2`. Under `version: 1`
+the file behaves exactly as it always has: `allow` is treated as `ask` and `observe` is rejected at load
+time (`observe-requires-v2`), so a policy cannot change meaning by accident.
+
 Self-protection (`rules.selfProtect`) is the one rule whose mode accepts only `ask` or `deny`: a switch
 that the file it protects could turn off is not a gate. It covers the plugin directory the host actually
 loaded, so editing `rules.js` or `lib/` through a tool raises a card. It is **not a sandbox**: hand edits,
@@ -74,37 +78,63 @@ previous good policy stays live, with one `config-invalid` audit record and a wa
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "enabled": true,
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
     "destructive":    { "mode": "ask", "patterns": [] },
     "secrets":        { "mode": "ask", "patterns": [] },
     "selfProtect":    { "mode": "ask", "paths": [] }
-  }
+  },
+  "entries": [
+    {
+      "id": "no-dist-delete",
+      "tool": ["pwsh"],
+      "mode": "deny",
+      "when": { "commandMatches": "^\\s*Remove-Item\\b.*\\\\dist\\b" }
+    }
+  ]
 }
 ```
 
 `patterns` appends your own regular expressions to the built-in lists.
 
+## Custom entries (P3, `version: 2`)
+
+An entry says "this tool, under these conditions, gets this outcome". All three `when` conditions must hold
+(`cwdUnder`, `targetUnder`, `commandMatches`); an entry without `when` applies to every call of the listed
+tools. `targetUnder` is a path check, so it never matches a shell command's inline text — use `commandMatches`
+for those, and anchor it with `^` (unanchored patterns are rejected at load time).
+
+The four outcomes rank `deny` > `ask` > `observe` > `allow`. Entries compete with the built-in rules in one
+ranking, so an `entries.deny` can tighten a block that was lowered to `ask`, and an `entries.allow` never
+clears a built-in hit — it only records "this was declared allowed" (rank 0). The card says the rule in
+words (`Custom rule no-dist-delete blocks this call`), while the audit record keeps `rule: "E"` and
+`entryId`, plus every hit in `reasons[]`.
+
 ## Relaxing a rule
 
-To stop asking about a class of commands, policy has only two directions: lower a whole block's `mode` to
-`deny`/`off`, or enable `destructive.workspaceQuiet` (in-workspace deletes go through). Writing
-`"mode": "allow"` relaxes nothing today — R1 / R2 / R3 all treat it as `ask`
-(`dsh-guardrails/lib/rules/r2-destructive.js:63`).
+To stop asking about a class of commands, lower a whole block's `mode` and keep the dangerous subset caught:
 
-P3 adds an `entries` table (not implemented yet, see `design/p3-policy-v2.md` §2.2). Its `allow` entries rank
-lowest and never outvote a built-in `ask`/`deny`/`observe`; they only record "this command was explicitly
-declared allowed". They cannot clear a false positive. Relaxing for real means lowering a block's `mode` and
-using `entries.deny` to keep the dangerous subset caught.
+- `"mode": "deny"` refuses the block outright; `"off"` disables it (no record at all).
+- `"mode": "observe"` (`version: 2`) lets every hit through and writes an `observed` record — the rehearsal
+  mode, for finding out how often a rule would fire before trusting it.
+- `"mode": "allow"` (`version: 2`) lets the block through and writes an `allowed` record.
+- Or enable `destructive.workspaceQuiet` (P1.7): in-workspace deletes stop asking, temp-directory and
+  recursive deletes still do.
+- Then add `entries` with `mode: "deny"` for the commands that must stay refused (rank 3 still wins inside
+  the block that was relaxed).
+
+Under `version: 1` only the first bullet exists: `allow` is treated as `ask` and `observe` is rejected at
+load time, so the old files keep their old behaviour. `entries.allow` is never a way to whitelist a false
+positive — it ranks below every built-in `ask`/`deny`/`observe`.
 
 ## What you get afterwards
 
 - **Audit**: `~/.dsh/guardrails/audit/v2/` — `requested` / `delivered` / `outcome` / `executed` records,
-  plus `allowed` for the opt-in workspace quiet (P1.7)
-  with a hash chain; full command text lives under `payload/`, secrets keep only the hash. Read it with
-  `node tools/audit-report.mjs --stats --verify`.
+  plus `allowed` for the opt-in workspace quiet (P1.7) and for `mode: "allow"` blocks, plus `observed` for
+  `mode: "observe"` blocks (P3), with a hash chain; full command text lives under `payload/`, secrets keep only
+  the hash. Read it with `node tools/audit-report.mjs --stats --verify`.
 - **Heartbeat**: `~/.dsh/guardrails/loaded.json`. Fresh mtime plus a matching version is the liveness
   signal; a pid proves nothing.
 - **No new daemon**: it runs inside the DSH host process.

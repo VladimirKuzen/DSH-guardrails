@@ -419,7 +419,7 @@ Get-Content args.json -Raw | & $node dsh-guardrails/tools/check.mjs --tool pwsh 
 |---|---|---|---|
 | 1 | 契约表 + `test/contract.test.mjs`（只测现状，含 `knownGap`）**（已完成 2026-11-16，见 §5.4）** | 先把今天的行为钉死，后面每步都能证明“没变” | 删文件 |
 | 2 | `lib/rules/r1-self.js` 自保护 + 合并 roots 文案 + `policy.schema.json` / `validate.js` / 启动校验 **（已完成 2026-11-16，见 §7.1）** | 小而加性；先于引擎重构落地 | 还原两个文件 + 重启 |
-| 3 | 引擎 v2（收集 + rank + `reasons[]` + entries + observe），`version:1` 完全走老路径 | 最大一块，前面已有护栏 | 还原 `rules.js` + 重启 |
+| 3 | 引擎 v2（收集 + rank + `reasons[]` + entries + observe），`version:1` 完全走老路径 **（已完成 2026-11-17，见 §7.2）** | 最大一块，前面已有护栏 | 还原 `rules.js` + 重启 |
 | 4 | `tools/check.mjs` + `test/cli.test.mjs` + `bin` | 依赖第 3 步的返回值形状 | 删文件 |
 | 5 | 文档：本文转正、`docs/threat-model.md` 补“非沙箱”与已知绕过、`design/p3-handoff.md` §6 加指针 | 计划 §6.2 第三条是文档交付项 | 还原 md |
 
@@ -459,6 +459,34 @@ Get-Content args.json -Raw | & $node dsh-guardrails/tools/check.mjs --tool pwsh 
 3. **shell 里的相对路径提法（已知缺口，未修）**：`Set-Content dsh-guardrails\x.txt` 这种命令里没有绝对根，`mentionsPathNearWrite` 不匹配 → 自保护漏；同一命令经 `pwsh` 沙箱反而被 OS 拒绝（DSH 沙箱不放行插件目录写入），属于外部兜底而非本护栏。登记为 `knownGap`。
 
 live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入插件目录触发审批卡，卡片正文含“受保护目录”，审计四事件齐全（`requested → delivered → outcome: allowed-once → executed`），`facts.protectedHit: true`。
+
+### 7.2 第 ③ 步落地状态（2026-11-17）
+
+新增 / 改动（全部在 `dsh-guardrails/`）：
+
+| 文件 | 改动 |
+|---|---|
+| `rules.js` | 重写为三部分：`RANK = { deny: 3, ask: 2, observe: 1, allow: 0 }`、`MAX_REASONS = 8`；`evaluate()` 按 `policy.version === 2` 分派；`evaluateV1` 是旧的逐带短路（字节不变），`evaluateV2` 收集 R3→R1home→R1self→R2c→R2d→entries 的候选后按 rank 取赢家 |
+| `lib/rules/r3-secrets.js` | 加 `opts` 与 `modeForV2()`：`observe` 保持 observe；shell 命令只要不是 observe 仍一律 `deny`（卡片回显命令）；非 shell 才可能 `allow` |
+| `lib/rules/r1-home.js` / `lib/rules/r1-self.js` | 加 `opts`：v2 下返回配置的 mode（self 的 schema 仍只允许 ask/deny，运行期门禁再加一层） |
+| `lib/rules/r2-destructive.js` | 拆出 `evaluateR2Parts()` → `{ critical, destructive }`，让两条带各自参与排序；`evaluateR2()` 保留为 critical 优先，v1 不受影响 |
+| `lib/rules/entries.js`（新） | `evaluateEntries()`：工具匹配 + `when` 三条件 AND（`cwdUnder` / `targetUnder` / `commandMatches`），返回 `{ rule: 'E', entryId, mode, reason }` |
+| `index.js` | `auditTarget()` / `payloadOf()` 改看 `secretHit === true`（不只是赢家 R3）；`fieldsFor` 透传 `entryId`/`reasons`；quiet 增加“reasons 全是非 critical 的 R2 且 `!secretHit`”；新增 `observe` 分支（写 `observed` 事件后 `next()`） |
+| `lib/audit/v2.js` | 记录白名单补 `entryId` / `reasons` |
+| `lib/describe.js` + `i18n/*.json` | `rule: 'E'` 渲染成人话：`action.entry.deny/ask/observe/allow`（zh “自定义规则 {id} 禁止此调用 / 要求确认 / 命中，仅记录 / 允许此调用”） |
+| `lib/policy/validate.js` | `SUPPORTED_VERSION = 2`；`allow-requires-v2` 只在 v1 触发；新增 `critical-mode-invalid`、`observe-requires-v2` |
+| `policy.schema.json` | 四个规则块的 `mode` enum 加 `observe`（critical 的取值由语义校验兜住） |
+| `test/engine-v2.test.mjs`（新，17 条） | v1 输出不变、rank 与并列、entries 四种 mode、when 合取与路径段比较、R3 的 shell 钳制、`secretHit` 在更严赢家下仍为真、E 卡片文案、两份语言包键齐全 |
+| `test/contract.test.mjs` / `test/fixtures/contract-cases.json` | 5 条 `v2Only` 转正；新增 `cwd` 字段；quiet 门禁镜像 index.js；表自检对非 allow 结论强制要求 `rule` |
+| `test/plugin.smoke.mjs` | 追加 6 条 mount 级 v2：E 拒绝的审计、E 卡片中文、observe 的 `observed` 事件、observe 密钥不落盘、密钥+deny 时 payload 不写、allow 记 `allowed` |
+
+实测：**13 个文件 269 条全绿**（audit 11、contract 69、critical 15、describe 17、dry-run 10、engine-v2 17、facts 25、policy-schema 8、quiet 19、replay 3、rules 27、self-protect 19、smoke 29），`contract` 的 4 条跳过已归零。
+
+实现中确定的三条：
+
+1. **R3 的 `allow` 只在非 shell 生效**：`rules.secrets.mode = "allow"` 下，`write` 里含 token 也放行并记 `allowed`；但 shell 命令仍被钳成 `deny`（`modeForV2`），因为卡片正文会回显 `args.command`。这条钳制不因配置让步。
+2. **`observe` 事件只属于 v2**：`version: 1` 出现 `observe` 直接 `observe-requires-v2`（v1 里它会被夹成 ask，静默改变语义）。
+3. **`entries` 的 `cwd` 必须归一化**：`when.cwdUnder` 用 `expandPath(env.CWD)` 后的串做 `isUnder` 比较，按路径段而不是字符串前缀（`proj2` 不会被 `proj` 命中）——首版忘了归一化，测试立刻抓到。
 
 ---
 
@@ -523,7 +551,7 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 ## 11. 未验证项（不写“应该没问题”）
 
 1. `apply_patch` 的真实参数形状——宿主 checkout `C:\Users\<you>\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh\` 在本机不存在（路径无效），读不到定义。**2026-11-16 更新**：自保护侧已用"扫描所有字符串参数里的 `*** File:` 行"绕开这个未知（§7.1 第 2 条）；仍未验证的是宿主到底把补丁放在哪个键、以及 R1home 的 `gap-apply-patch-delete-dsh` 是否要同法修补。
-2. observe 场景返回 `next()` 是否与 allow 完全等价——按 `tools/pre-execute` 契约推断，未 live 验证。
+2. observe 场景返回 `next()` 是否与 allow 完全等价——按 `tools/pre-execute` 契约推断，未 live 验证。**2026-11-17 更新**：mount 级测试已确认 `decision.kind === 'allow'` 且审计只有 `observed` 一条（不是 `allowed`），但宿主真实放行流程仍未 live 走一遍。
 3. ~~自保护在 junction/软链加载下的真实路径~~ —— **2026-11-16 已验**：profile 里 `@vlad/dsh-guardrails` 是指向工作区的 junction，`realpathSync` 解析出 `D:\work\guardrails\dsh-guardrails`，`assertSelfRoot` 通过。
 4. ~~`dsh-guardrails/index.js:334` 的 `roots` 合并后对 `facts.protectedHit` 的实际文案~~ —— **2026-11-16 已验**：`test/self-protect.test.mjs` 断言合并 roots 后 `facts.protectedHit === true` 且卡片含 `受保护目录` / `protected directory`。
 5. ~~`write`/`edit`/`apply_patch` 的审批卡片是否预览参数正文~~ —— **2026-11-16 已验**：`write` 弹卡、卡片不含正文（用户确认），`describe()` 只给 label（§2.6-1）。残余：用户反馈卡片上没见到路径与提示，待确认是否渲染 bug。

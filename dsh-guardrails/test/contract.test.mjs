@@ -11,8 +11,10 @@
  * Two case kinds need a caveat, and both are asserted honestly:
  *   - `knownGap: true` cases assert that the current build still lets the call
  *     through. When one is fixed, flip the expectation; do not leave a red test.
- *   - `v2Only: true` cases describe P3 behaviour (entries, observe, self
- *     protection). They are skipped until the v2 engine lands.
+ *   - `v2Only: true` cases describe engine v2 behaviour (entries, observe, allow)
+ *     and only run with `"version": 2` in their policy.
+ *   `v2Only` cases describe engine v2 behaviour (entries, observe, allow); they
+ *   carry their own `"version": 2` policy and run like any other case.
  *
  * Workspace quiet lives in `index.js` rather than in `evaluate()`. The runner
  * mirrors that wiring with the same two helpers (`collectFacts`, `decideQuiet`
@@ -66,12 +68,17 @@ function decisionOf(verdict) {
 function decide(tc) {
   const policy = tc.policy ?? DEFAULT_POLICY;
   const call = { name: tc.tool, arguments: tc.args };
-  const env = { ...BASE_ENV, ...(tc.env ?? {}) };
+  // `cwd` is what index.js passes as env.CWD; entries and relative paths need it.
+  const env = { ...BASE_ENV, ...(tc.cwd === undefined ? {} : { CWD: tc.cwd }), ...(tc.env ?? {}) };
 
   let verdict = evaluate(policy, call, env);
 
-  // Same gate as index.js:343: only an ordinary R2 ask can be quieted.
-  if (verdict !== null && verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined) {
+  // Same gate as index.js: only an ordinary R2 ask can be quieted, and under v2
+  // every reason must be an ordinary R2 with no secret in the call.
+  const onlyOrdinaryR2 = verdict?.reasons === undefined
+    || verdict.reasons.every((reason) => reason.rule === 'R2' && reason.severity === undefined);
+  if (verdict !== null && verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined
+    && onlyOrdinaryR2 && verdict.secretHit !== true) {
     const roots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
     // Quiet needs the target to exist as a single file; `io` stubs that stat so
     // the table does not depend on files on the machine that runs it.
@@ -121,7 +128,7 @@ test('contract table: every case is well formed', () => {
       EXIT_BY_DECISION[decision],
       `${tc.id}: exitCode must match decision (${decision} -> ${EXIT_BY_DECISION[decision]})`,
     );
-    if (decision !== 'allow' && !tc.v2Only) {
+    if (decision !== 'allow') {
       assert.equal(typeof tc.expect.rule, 'string', `${tc.id}: a gated case needs a rule id`);
     }
     assert.ok(!(tc.knownGap && tc.v2Only), `${tc.id}: a case cannot be both knownGap and v2Only`);
@@ -135,7 +142,7 @@ for (const tc of CASES) {
       ? `contract (v2): ${tc.id}`
       : `contract: ${tc.id}`;
 
-  test(name, { skip: tc.v2Only ? 'v2 only: entries / observe are not implemented yet' : false }, () => {
+  test(name, () => {
     const verdict = decide(tc);
     const decision = decisionOf(verdict);
 

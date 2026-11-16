@@ -52,7 +52,26 @@ const entry = () => ({
 
 test('schema: the document itself keeps the strict shape', () => {
   assert.equal(SCHEMA.additionalProperties, false);
-  assert.equal(SUPPORTED_VERSION, 1);
+  assert.equal(SUPPORTED_VERSION, 2);
+});
+
+test('schema: a version 2 policy with entries, allow and observe passes', () => {
+  const report = validatePolicy({
+    version: 2,
+    enabled: true,
+    rules: {
+      protectDshHome: { mode: 'observe' },
+      critical: { mode: 'deny', failClosed: true },
+      destructive: { mode: 'allow' },
+      secrets: { mode: 'observe' },
+      selfProtect: { mode: 'ask', paths: [] },
+    },
+    entries: [
+      { id: 'no-prod-delete', tool: ['pwsh'], mode: 'deny', when: { cwdUnder: ['D:\\work\\prod'] } },
+      { id: 'allow-build', tool: ['pwsh'], mode: 'allow', when: { commandMatches: '^\\s*npm run build\\b' } },
+    ],
+  });
+  assert.equal(report.ok, true, describeErrors(report.errors));
 });
 
 test('schema: empty, minimal, todays and defaults-shaped policies pass', () => {
@@ -86,12 +105,13 @@ test('schema: known-bad samples are rejected at the offending path', () => {
       'unknown-key',
     ],
     ['allow under version 1', { version: 1, rules: { destructive: { mode: 'allow' } } }, 'rules.destructive.mode', 'allow-requires-v2'],
+    ['observe under version 1', { version: 1, rules: { destructive: { mode: 'observe' } } }, 'rules.destructive.mode', 'observe-requires-v2'],
     ['version 3', { version: 3 }, 'version', 'unsupported-version'],
-    ['version 2 before engine v2 lands', { version: 2 }, 'version', 'unsupported-version'],
     ['self-protect off', { rules: { selfProtect: { mode: 'off' } } }, 'rules.selfProtect.mode', 'enum'],
     ['self-protect allow', { rules: { selfProtect: { mode: 'allow' } } }, 'rules.selfProtect.mode', 'enum'],
     ['self-protect without mode', { rules: { selfProtect: { paths: [] } } }, 'rules.selfProtect.mode', 'required'],
-    ['critical observe', { rules: { critical: { mode: 'observe' } } }, 'rules.critical.mode', 'enum'],
+    ['critical observe', { rules: { critical: { mode: 'observe' } } }, 'rules.critical.mode', 'critical-mode-invalid'],
+    ['critical allow', { version: 2, rules: { critical: { mode: 'allow' } } }, 'rules.critical.mode', 'critical-mode-invalid'],
     ['patterns must be an array', { rules: { destructive: { patterns: 'rm' } } }, 'rules.destructive.patterns', 'type'],
     ['audit format unknown', { audit: { format: 'v3' } }, 'audit.format', 'enum'],
     ['maxPayloadBytes zero', { audit: { maxPayloadBytes: 0 } }, 'audit.maxPayloadBytes', 'minimum'],

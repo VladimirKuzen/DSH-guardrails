@@ -21,15 +21,16 @@ import {
  * @param {{name: string, arguments?: object, args?: object}} call
  * @param {object} rule the policy slice rules.protectDshHome
  * @param {object} env shape: { USERPROFILE, DSH_HOME, AGENTS_HOME }
+ * @param {{v2?: boolean}} [opts] engine v2 reports the configured mode as-is
  * @returns {null | {rule: 'R1', mode: string, reason: string}}
  */
-export function evaluateR1(call, rule = {}, env) {
+export function evaluateR1(call, rule = {}, env, opts = {}) {
   if (rule.mode === 'off') return null;
   const name = str(call?.name);
   const args = call?.arguments ?? call?.args ?? {};
   const roots = (rule.roots ?? ['~/.dsh', '~/.agents']).map((root) => expandPath(root, env)).filter(Boolean);
   const alwaysAsk = new Set(rule.alwaysAskTools ?? ['plugin_manager']);
-  const mode = rule.mode === 'deny' ? 'deny' : 'ask';
+  const mode = opts.v2 === true ? (rule.mode ?? 'ask') : (rule.mode === 'deny' ? 'deny' : 'ask');
 
   if (alwaysAsk.has(name)) {
     return {

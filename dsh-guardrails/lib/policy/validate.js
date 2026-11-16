@@ -17,8 +17,8 @@ import { readFileSync } from 'node:fs';
 
 export const SCHEMA = JSON.parse(readFileSync(new URL('../../policy.schema.json', import.meta.url), 'utf8'));
 
-/** Highest policy version this release understands. Bumped when engine v2 lands. */
-export const SUPPORTED_VERSION = 1;
+/** Highest policy version this release understands. 2 selects the ranked engine. */
+export const SUPPORTED_VERSION = 2;
 
 const at = (path, index) => `${path}[${index}]`;
 const join = (path, key) => (path === '' ? key : `${path}.${key}`);
@@ -117,18 +117,33 @@ export function validatePolicy(policy) {
     errors.push({
       path: 'version',
       code: 'unsupported-version',
-      message: `version ${policy.version} is not supported by this release (engine v2 is not implemented yet); only version ${SUPPORTED_VERSION} is accepted`,
+      message: `version ${policy.version} is not supported by this release; only version ${SUPPORTED_VERSION} is accepted`,
     });
   }
 
   const rules = policy.rules ?? {};
   for (const [name, rule] of Object.entries(rules)) {
-    if (rule?.mode === 'allow') {
+    if (rule?.mode === 'allow' && policy.version !== 2) {
       errors.push({
         path: `rules.${name}.mode`,
         code: 'allow-requires-v2',
         message: '"allow" is only a rule mode under policy version 2, where it really lets calls through; '
           + 'in version 1 it would be clamped to ask, so it is rejected instead of silently ignored',
+      });
+    }
+    if (name === 'critical' && rule !== null && typeof rule === 'object'
+      && rule.mode !== undefined && !['ask', 'deny', 'off'].includes(rule.mode)) {
+      errors.push({
+        path: 'rules.critical.mode',
+        code: 'critical-mode-invalid',
+        message: `critical operations accept only "ask", "deny" or "off"; "${rule.mode}" would let a disk/boot/registry operation through without a card`,
+      });
+    }
+    if (rule?.mode === 'observe' && policy.version !== 2) {
+      errors.push({
+        path: `rules.${name}.mode`,
+        code: 'observe-requires-v2',
+        message: '"observe" only means something under policy version 2; in version 1 it would be clamped to ask, so it is rejected instead of silently ignored',
       });
     }
     if (name === 'selfProtect' && rule !== null && typeof rule === 'object' && rule.mode === 'off') {
@@ -146,7 +161,7 @@ export function validatePolicy(policy) {
       entryIds.add(entry.id);
     }
     if (policy.version !== 2) {
-      errors.push({ path: base, code: 'entries-require-v2', message: 'entries are only read by engine v2 (policy version 2), which this release does not implement yet' });
+      errors.push({ path: base, code: 'entries-require-v2', message: 'entries are only read by engine v2; set "version": 2 to use them (with version 1 they would be ignored, so the file is rejected instead)' });
     }
     const when = entry?.when ?? {};
     const narrowing = ['cwdUnder', 'targetUnder', 'commandMatches'].filter((key) => when[key] !== undefined).length;

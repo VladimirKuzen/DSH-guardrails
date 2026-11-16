@@ -19,6 +19,9 @@
 设成 `ask`（降级为带 ⛔ 的审批卡）或 `off`（退回普通 R2）；`rules.critical.failClosed`（默认开）
 让这一层在判定本身抛异常时仍然保持拒绝。
 
+`observe` 与 `allow` 是 P3 新增的档位，只在 `"version": 2` 下存在。`version: 1` 的文件行为与从前完全一致：
+`allow` 仍被当作 `ask`、`observe` 在加载时直接拒绝（`observe-requires-v2`），所以旧配置不会因为升级而悄悄改变含义。
+
 自保护（`rules.selfProtect`）是唯一只接受 `ask` / `deny` 的规则：一个能被它保护的文件关掉的开关不算护栏。
 它保护的是宿主真正加载的那个插件目录，所以用工具改 `rules.js` 或 `lib/` 会弹卡。它**不是沙箱**：手工编辑、
 别的进程、插件进程内部的 `fs` 写、以及参数里只有 patch 文本的 `apply_patch` 都不经过它。
@@ -64,33 +67,58 @@
 
 ```json
 {
-  "version": 1,
+  "version": 2,
   "enabled": true,
   "rules": {
     "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
     "destructive":    { "mode": "ask", "patterns": [] },
     "secrets":        { "mode": "ask", "patterns": [] },
     "selfProtect":    { "mode": "ask", "paths": [] }
-  }
+  },
+  "entries": [
+    {
+      "id": "no-dist-delete",
+      "tool": ["pwsh"],
+      "mode": "deny",
+      "when": { "commandMatches": "^\\s*Remove-Item\\b.*\\\\dist\\b" }
+    }
+  ]
 }
 ```
 
 `patterns` 用来在内置清单之外追加你自己的正则。
 
+## 自定义条目（P3，`version: 2`）
+
+一条 entry 的意思是"这个工具、在这些条件下、得到这个处置"。`when` 的三个条件必须同时成立
+（`cwdUnder`、`targetUnder`、`commandMatches`）；不写 `when` 则对所列工具的每次调用都生效。`targetUnder`
+是路径判断，对 shell 命令里的内联文本不生效——这类用 `commandMatches`，并且必须以 `^` 锚定（未锚定的
+正则在加载时就被拒绝）。
+
+四种处置的优先级是 `deny` > `ask` > `observe` > `allow`。条目与内置规则在同一张排序里竞争：所以
+`entries.deny` 能把已经降到 `ask` 的块重新收紧，而 `entries.allow` 永远盖不过内置命中——它只记录
+"这条被显式声明允许"（rank 0）。卡片上用中文说人话（`自定义规则 no-dist-delete 禁止此调用`），
+审计记录里仍是 `rule: "E"` 加 `entryId`，全部命中在 `reasons[]` 里。
+
 ## 想放宽时
 
-要让某一类命令不再弹审批，`policy.json` 里只有两个方向：把整块的 `mode` 调成 `deny`/`off`，或者打开
-`destructive.workspaceQuiet`（工作区内的删除不问）。**把 `mode` 写成 `"allow"` 不放宽任何东西**——R1 / R2 / R3
-今天都把它当作 `ask`（`dsh-guardrails/lib/rules/r2-destructive.js:63`），写了只会让你以为已经放行。
+要让某一类命令不再弹审批，走"降块级 `mode`，再把危险的那几条捞回来"：
 
-P3 之后会多一张 `entries` 表（尚未实现，见 `design/p3-policy-v2.md` §2.2）：其中的 `allow` 条目优先级最低，
-永远盖不过内置规则的 `ask`/`deny`/`observe`，它只负责留下“这条命令被显式声明允许”的审计痕迹，不能用来给误拦开白。
-真正要放宽，走的是“降块级 `mode`，再用 `entries.deny` 把危险的那几条捞回来”。
+- `"mode": "deny"` 整块拒绝；`"off"` 整块关闭（连记录都没有）。
+- `"mode": "observe"`（`version: 2`）全部放行，但写一条 `observed` 记录——预演档，用来看某条规则要是上线
+  会多频繁地命中，再决定要不要信任它。
+- `"mode": "allow"`（`version: 2`）全部放行，写一条 `allowed` 记录。
+- 或者打开 `destructive.workspaceQuiet`（P1.7）：工作区内的删除不问，临时目录与递归删除照问。
+- 然后用 `entries` 里 `mode: "deny"` 把必须拦住的命令写回去（rank 3 在放宽过的块里仍然赢）。
+
+`version: 1` 下只有第一条可用：`allow` 被当作 `ask`、`observe` 加载即拒，旧文件保持旧行为。
+`entries.allow` 从来不是"给误拦开白"的手段——它排在所有内置 `ask`/`deny`/`observe` 之后。
 
 ## 装上之后
 
 - **审计**：`~/.dsh/guardrails/audit/v2/`——`requested` / `delivered` / `outcome` / `executed` 事件流，
-  外加可选的 `allowed`（P1.7 工作区静默放行）；带哈希链；命令原文在 `payload/`，密钥只留哈希。
+  外加可选的 `allowed`（P1.7 工作区静默放行，以及 `mode: "allow"` 的块）和 `observed`（`mode: "observe"`
+  的块，P3）；带哈希链；命令原文在 `payload/`，密钥只留哈希。
   用 `node tools/audit-report.mjs --stats --verify` 读取。
 - **心跳**：`~/.dsh/guardrails/loaded.json`。判据是“修改时间新鲜 + 版本一致”，pid 不可信。
 - **不新增常驻进程**：它跑在 DSH 宿主进程里。

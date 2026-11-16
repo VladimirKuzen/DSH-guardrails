@@ -13,9 +13,8 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   editing the gate through a tool; it is not a sandbox — hand edits, other processes and an `fs` write
   inside the plugin still bypass it.
 - Policy files are validated against `policy.schema.json` before they are merged: unknown keys (typos) are
-  rejected, `version` above 1 is refused until the v2 engine lands, and a file that fails validation is
-  ignored — the previous good policy stays live, with one `config-invalid` audit record instead of a
-  silently weakened gate.
+  rejected, `version` above 2 is refused, and a file that fails validation is ignored — the previous good
+  policy stays live, with one `config-invalid` audit record instead of a silently weakened gate.
 - The policy schema ships in the package (`files`), so an installed copy can validate too.
 - Optional dry run before an unreadable destructive command (`rules.destructive.dryRun`, off by default):
   when the target is a variable, the command is long, or it chains several destructive steps, the first
@@ -26,6 +25,18 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   `New-Item … ; Remove-Item …` reads as a delete rather than "create directory". A target set by a variable
   is reported as such (`target set by a variable`, or `see the read-only listing above` after a dry run)
   instead of the target segment disappearing.
+- Policy engine v2 (`"version": 2`): every rule that matches is now collected, ranked
+  (`deny` > `ask` > `observe` > `allow`) and resolved to one winner instead of stopping at the first band.
+  `version: 1` files take the old path unchanged.
+- `observe` records a hit without blocking or carding (`event: "observed"`); `allow` lets a block through and
+  records `event: "allowed"`. Both exist only under `version: 2`; under `version: 1` `observe` is rejected at
+  load time and `allow` is still treated as `ask`.
+- Custom `entries`: a tool plus conditions (`cwdUnder` / `targetUnder` / `commandMatches`, all must hold) plus
+  a mode. They rank with the built-in rules, so an `entries.deny` can tighten a block that was lowered, while
+  `entries.allow` never clears a built-in hit. The card says the rule in words; the audit keeps `rule: "E"`
+  and `entryId`, plus every hit in `reasons[]` (at most 8).
+- A secret that was seen anywhere in the call keeps the R3 payload shape (hash only, no stored text) even when
+  a stricter rule wins the ranking.
 
 ## [1.4.0] - 2026-11-15
 

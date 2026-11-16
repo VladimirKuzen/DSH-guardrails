@@ -6,6 +6,11 @@
  * read-only diagnostics pass, and only then the destructive pattern list is
  * tried. Without that order `diskpart list disk` would be caught by the bare
  * `diskpart` pattern and a full format command would be asked instead of refused.
+ *
+ * `evaluateR2Parts` exposes the two tiers separately so engine v2 can rank them
+ * against the other bands; `evaluateR2` keeps the v1 contract (critical wins).
+ * `evaluateR2Parts` 把两层分开返回，供 v2 排序；`evaluateR2` 保持 v1 的语义
+ * （critical 优先）。
  */
 
 import { readOnlyDiagnostic } from '../critical.js';
@@ -15,9 +20,10 @@ import { DEFAULT_DESTRUCTIVE, SHELL_TOOLS, criticalReason, findCritical, str } f
  * @param {{name: string, arguments?: object, args?: object}} call
  * @param {object} rules the policy slice rules (reads rules.critical and rules.destructive)
  * @param {object} env shape: { USERPROFILE, DSH_HOME, AGENTS_HOME, SystemRoot, ProgramFiles, ... }
- * @returns {null | {rule: 'R2', mode: string, severity?: 'critical', category?: string, reason: string, target?: string}}
+ * @param {{v2?: boolean}} [opts] engine v2 reports the configured destructive mode as-is
+ * @returns {{critical: object|null, destructive: object|null}}
  */
-export function evaluateR2(call, rules = {}, env) {
+export function evaluateR2Parts(call, rules = {}, env, opts = {}) {
   const name = str(call?.name);
   const args = call?.arguments ?? call?.args ?? {};
 
@@ -29,18 +35,21 @@ export function evaluateR2(call, rules = {}, env) {
     if (critical !== null) {
       const mode = criticalRule.mode === 'ask' ? 'ask' : 'deny';
       return {
-        rule: 'R2',
-        severity: 'critical',
-        category: critical.category,
-        mode,
-        reason: criticalReason(critical, mode),
-        ...(critical.target === '' ? {} : { target: critical.target }),
+        critical: {
+          rule: 'R2',
+          severity: 'critical',
+          category: critical.category,
+          mode,
+          reason: criticalReason(critical, mode),
+          ...(critical.target === '' ? {} : { target: critical.target }),
+        },
+        destructive: null,
       };
     }
 
     // Read-only diagnostics stay usable; this must run before the R2 patterns,
     // otherwise `diskpart list disk` would be caught by the bare `diskpart` one.
-    if (readOnlyDiagnostic(command)) return null;
+    if (readOnlyDiagnostic(command)) return { critical: null, destructive: null };
   }
 
   // ---- R2 destructive operations
@@ -58,14 +67,33 @@ export function evaluateR2(call, rules = {}, env) {
       const hit = re.exec(command);
       if (hit) {
         const shown = (hit[1] ?? hit[0]).trim();
+        const mode = opts.v2 === true
+          ? (destructiveRule.mode ?? 'ask')
+          : (destructiveRule.mode === 'deny' ? 'deny' : 'ask');
         return {
-          rule: 'R2',
-          mode: destructiveRule.mode === 'deny' ? 'deny' : 'ask',
-          reason: `Guardrails R2: destructive shell operation "${shown}" requires explicit approval.`,
+          critical: null,
+          destructive: {
+            rule: 'R2',
+            mode,
+            reason: `Guardrails R2: destructive shell operation "${shown}" requires explicit approval.`,
+          },
         };
       }
     }
   }
 
-  return null;
+  return { critical: null, destructive: null };
+}
+
+/**
+ * v1 entry point: the strictest tier this rule has, or null.
+ * @param {{name: string, arguments?: object, args?: object}} call
+ * @param {object} rules the policy slice rules
+ * @param {object} env shape: { USERPROFILE, DSH_HOME, AGENTS_HOME, SystemRoot, ProgramFiles, ... }
+ * @param {{v2?: boolean}} [opts]
+ * @returns {null | {rule: 'R2', mode: string, severity?: 'critical', category?: string, reason: string, target?: string}}
+ */
+export function evaluateR2(call, rules = {}, env, opts = {}) {
+  const { critical, destructive } = evaluateR2Parts(call, rules, env, opts);
+  return critical !== null ? critical : destructive;
 }
