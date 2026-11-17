@@ -26,6 +26,8 @@
   页面要显示的 readme，也没有许可证正文。现在 `pnpm pack` 为 40 个条目，不含 `test/` 与 `design/`。
 - CI：`.github/workflows/test.yml` 在 `windows-latest` + Node 24 上跑全套测试与 `check` 冒烟
   （`git reset --hard` 必须退出 2）。两个 action 钉 commit SHA；包零依赖，所以没有安装步骤。
+- 首次 CI 运行全绿（2026-11-17），顺带说明 `npm test` 在真实 npm 下的结果与本机自带 Node 跑出来一致。
+- (安装一节的那条移到下一条提交)
 
 ## [1.5.0] — 2026-11-17
 

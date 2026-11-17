@@ -31,6 +31,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 - CI: `.github/workflows/test.yml` runs the suite and the `check` CLI smoke (`git reset --hard` must exit 2) on
   `windows-latest` with Node 24. Both actions are pinned to commit SHAs, and there is no install step because
   the package has no dependencies.
+- The first CI run is green (2026-11-17), which also shows `npm test` behaves the same under real npm as under
+  the bundled Node used locally.
+- (install-section bullet moves to the next commit)
 
 ## [1.5.0] — 2026-11-17
 
