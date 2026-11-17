@@ -9,7 +9,7 @@ and leaves a local audit trail of what was gated.
 - **Deterministic**: path and pattern rules only. No model calls, no network, no judgment from the same
   model that proposes the action.
 - **Auditable**: every gated call writes one JSONL line; secrets are never written in clear text.
-- **Windows-only**, pre-1.0. Path semantics assume Windows (`~`, `%VAR%`, `$env:VAR`, backslashes).
+- **Windows-only**, 1.x. Path semantics assume Windows (`~`, `%VAR%`, `$env:VAR`, backslashes).
 
 **Status**: v1.5.0. The critical tier and the audit v2 stream were verified live on Windows 11
 (2026-11-15): denied calls return no card and never execute, an approved call produces the full
@@ -27,6 +27,8 @@ quiet and the `check` CLI were added and exercised live; `CHANGELOG.md` lists ea
 | [docs/ARCHITECTURE.md](dsh-guardrails/docs/ARCHITECTURE.md) | You are changing the code and need the file map |
 | [docs/DSH-API.md](dsh-guardrails/docs/DSH-API.md) | You are upgrading DSH, or something went quiet |
 | [CHANGELOG.md](CHANGELOG.md) ([中文](CHANGELOG.zh-CN.md)) | You want the history and the reasons |
+| [SECURITY.md](SECURITY.md) | You found a way through the gate |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | You want to add a rule or change the policy format |
 | [design/](design/) | You want the measurements and the rejected alternatives |
 
 ## Why
@@ -206,6 +208,8 @@ node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 | `dsh-guardrails/tools/` | `check.mjs` (ask the gate from a terminal), `audit-report.mjs` (offline reader) |
 | `design/` | Decision records: measurements, rejected alternatives, known gaps |
 | `CHANGELOG.md` | Release history — English and Chinese versions |
+| `SECURITY.md` | Supported versions, what is in scope, how to report privately |
+| `CONTRIBUTING.md` | Ground rules, layout, how to add a rule without breaking the protocol |
 | `scripts/` | Maintainer tooling — audit redaction, snapshot/restore, health check. **Kept local (git-ignored), not part of this repository** |
 
 Maintainer tooling exists because audit files contain command text and paths. It snapshots and redacts
@@ -216,7 +220,7 @@ them locally, then encrypts the result with Windows DPAPI (bound to the current 
 No build step, no runtime dependencies. Tests run directly:
 
 ```powershell
-npm test   # runs the seventeen test files in order
+npm test   # runs the eighteen test files in order
 ```
 
 Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the child processes that runner spawns.

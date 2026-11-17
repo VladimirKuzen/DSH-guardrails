@@ -8,7 +8,7 @@
 - **宿主原生**：监听 `tools/pre-execute` 的 DSH 插件。没有守护进程、没有代理、不额外起进程。
 - **确定性判定**：只用路径和正则规则。不调用模型、不联网，也不依赖"发起动作的那个模型"来判断自己。
 - **可审计**：每次被拦截的调用写一行 JSONL；密钥永远不以明文落盘。
-- **仅 Windows**，1.0 之前。路径语义按 Windows 处理（`~`、`%VAR%`、`$env:VAR`、反斜杠）。
+- **仅 Windows**，1.x。路径语义按 Windows 处理（`~`、`%VAR%`、`$env:VAR`、反斜杠）。
 
 **状态**：v1.5.0。P1.6 系统级硬停与审计 v2 已在 Windows 11 上完成 live 验收（2026-11-15）：deny 不弹卡、
 命令不执行；批准后的调用产生完整的 `requested → delivered → outcome → executed` 链并带 payload；
@@ -25,6 +25,8 @@
 | [docs/ARCHITECTURE.md](dsh-guardrails/docs/ARCHITECTURE.md) | 要改代码，需要文件地图 |
 | [docs/DSH-API.md](dsh-guardrails/docs/DSH-API.md) | 要升级 DSH，或者有东西悄悄失灵 |
 | [CHANGELOG.zh-CN.md](CHANGELOG.zh-CN.md)（[English](CHANGELOG.md)） | 想看历史与理由 |
+| [SECURITY.md](SECURITY.md) | 你找到了一条穿过去的路径 |
+| [CONTRIBUTING.md](CONTRIBUTING.md) | 想加一条规则，或改策略格式 |
 | [design/](design/) | 想看测量数据与被否掉的方案 |
 
 ## 为什么需要它
@@ -190,6 +192,8 @@ node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 | `dsh-guardrails/tools/` | `check.mjs`（在终端里问一句）、`audit-report.mjs`（离线读取） |
 | `design/` | 决策记录：测量数据、被否掉的方案、已知缺口 |
 | `CHANGELOG.md` | 版本历史（英文与中文两份） |
+| `SECURITY.md` | 支持哪些版本、什么算漏洞、怎么私密报告 |
+| `CONTRIBUTING.md` | 改代码的底线、文件地图、加一条规则要动哪些地方 |
 | `scripts/` | 维护者工具：审计脱敏、快照/恢复、健康检查。**只留本地（已 gitignore），不属于本仓库** |
 
 之所以有这套工具，是因为审计文件里含命令原文和路径。它在本地做快照与脱敏，再用 Windows DPAPI
@@ -200,7 +204,7 @@ node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 无构建、无运行时依赖，测试直接跑：
 
 ```powershell
-npm test   # 依次跑十七个测试文件
+npm test   # 依次跑十八个测试文件
 ```
 
 要用 `node <文件>` 而不是 `node --test`：DSH 沙箱不允许测试运行器派生子进程。
