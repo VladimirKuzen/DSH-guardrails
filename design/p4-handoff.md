@@ -2,11 +2,12 @@
 
 **用途**：给接手 P4 的会话一个可读起点。P4 不继承 P1/P2/P3 的对话，只继承仓库里的文件。
 先读这份，再按需读 `design/p3-handoff.md`、`design/p3-policy-v2.md`、`dsh-guardrails/docs/ARCHITECTURE.md`。
+P4 的过程、拍板与验证证据记在 `design/p4-release.md`。
 路线图原文在仓库外 `D:\work\DSH-guardrails-DOCS\implementation-plan.md`（§7 是 P4 的原始条目，§6 已按实际落地改写）。
 
 ## 0. 现状快照（2026-11-17，P3 收口后）
 
-- 插件版本 **1.5.0**；`main = 82cdcd7`（`v1.5.0` 与 `p3` 都指向它，其后只有一条文档提交 `b726bed`）。
+- 插件版本 **1.5.0**；`main` 见 `git log`（P4 开工时的 `82cdcd7` 已在历史重写后换成新哈希）。
 - 测试：18 个文件 **404 条**全过（`dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联）。
 - 文档已就位：`README`/`README.zh-CN`、`CHANGELOG` 双语、`docs/{ARCHITECTURE,DSH-API,POLICY,POLICY.zh,DETAIL,DETAIL.zh}.md`、`examples/policy/` 四份模板（有测试保证可用）。
 - 仓库根已有：`LICENSE`（MIT，`Copyright (c) 2026 Vlad`）、`.gitignore`、`.gitattributes`。

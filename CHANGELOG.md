@@ -19,6 +19,8 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   instead of hard-coding it, so the case no longer depends on where the repository lives.
 - `README.md` / `README.zh-CN.md` no longer call the plugin "pre-1.0", and the test-file count in the
   development section now matches reality: 18 files, 404 cases.
+- `design/p4-release.md` records the four decisions, the stages, the history rewrite and the evidence behind
+  each claim.
 
 ## [1.5.0] — 2026-11-17
 
