@@ -4,6 +4,21 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
+## [未发布]
+
+- 发布配套文档：[SECURITY.md](SECURITY.md) 写明支持哪些版本（`1.x`；仅 Windows，"跨平台不工作"不算漏洞）、
+  什么算绕过、什么是已记录的边界，以及漏洞走 GitHub 私密报告而不是公开 issue。
+  [CONTRIBUTING.md](CONTRIBUTING.md) 写了改代码的底线、文件地图、加一条规则的六步、
+  以及 `policy.schema.json` 的兼容规则。
+- 新增 `test/docs.test.mjs`：`i18n/en.json` 与 `i18n/zh.json` 的 key 集合、`{占位符}` 集合必须一致；
+  被跟踪的 Markdown 里每条相对链接都必须能解析。链接检查还断言"至少扫到多少条"，
+  这样走查逻辑悄悄匹配不到东西时会失败，而不是假通过。
+- 已跟踪文件里不再有本机绝对路径：README 的 `quiet` 示例、`design/` 里的记录、三个测试文件都换成
+  `D:\work\...`、`%USERPROFILE%\...`、`%LOCALAPPDATA%\...` 占位。`test/self-protect.test.mjs`
+  改为从 checkout 推导工作区（`pluginRoot()` 的父目录），不再写死路径，所以这条用例不依赖仓库放在哪。
+- `README.md` / `README.zh-CN.md` 不再自称"1.0 之前"，开发一节的测试文件数改为与事实一致：18 个文件、
+  404 条。
+
 ## [1.5.0] — 2026-11-17
 
 - 补上一套文档：[docs/POLICY.zh.md](dsh-guardrails/docs/POLICY.zh.md) 讲档位、`entries`、三步放宽法与模板；

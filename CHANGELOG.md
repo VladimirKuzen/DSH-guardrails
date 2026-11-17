@@ -4,6 +4,22 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
+## [Unreleased]
+
+- Release paperwork: [SECURITY.md](SECURITY.md) states supported versions (`1.x`; Windows-only out of
+  scope), what counts as a bypass, what is a documented limit, and that reports go through GitHub's
+  private advisory instead of a public issue. [CONTRIBUTING.md](CONTRIBUTING.md) has the ground rules,
+  the file map, the six steps for adding a rule, and the rules for changing `policy.schema.json`.
+- New `test/docs.test.mjs`: `i18n/en.json` and `i18n/zh.json` must carry the same keys and the same
+  `{placeholder}` sets, and every relative link in the Markdown tree must resolve. The link test asserts a
+  minimum number of links scanned, so a walker that silently matches nothing fails instead of passing.
+- No machine-local paths remain in tracked files: the README's `quiet` example, the `design/` notes and
+  three test files now use `D:\work\...`, `%USERPROFILE%\...` or `%LOCALAPPDATA%\...` placeholders.
+  `test/self-protect.test.mjs` derives the workspace from the checkout (the parent of `pluginRoot()`)
+  instead of hard-coding it, so the case no longer depends on where the repository lives.
+- `README.md` / `README.zh-CN.md` no longer call the plugin "pre-1.0", and the test-file count in the
+  development section now matches reality: 18 files, 404 cases.
+
 ## [1.5.0] — 2026-11-17
 
 - Documentation set: [docs/POLICY.md](dsh-guardrails/docs/POLICY.md) covers the modes, `entries`, the
