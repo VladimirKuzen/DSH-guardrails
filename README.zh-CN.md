@@ -86,17 +86,26 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 ## 安装
 
 需要 Windows 上的 DSH。开发与验证针对 DSH desktop `0.2.2-rc.1`（Windows 11），其他宿主版本未测；包声明了
-`engines.dsh: ">=0.2.0-0"`，但没有观察到宿主校验它。包还没上 registry，用本地链接挂进 profile：
+`engines.dsh: ">=0.2.0-0"`，但没有观察到宿主校验它。包还没上 registry，先把仓库检出再挂进 profile：
 
-1. 在 `%USERPROFILE%\.dsh\profiles\<profile>\package.json` 的依赖里加：
+1. 克隆仓库 —— `git clone https://github.com/VladimirKuzen/DSH-guardrails.git`。仓库在发布准备期是私有的，
+   这一步需要你有访问权。
+2. 在 `%USERPROFILE%\.dsh\profiles\<profile>\package.json` 的依赖里加：
 
    ```json
-   "@vlad/dsh-guardrails": "link:<指向本仓库的绝对路径>\\dsh-guardrails"
+   "@vlad/dsh-guardrails": "link:<检出目录的绝对路径>\\dsh-guardrails"
    ```
 
-2. 在同一个文件的 `dsh.profile.bundles` 里加上 `@vlad/dsh-guardrails`。
-3. 在 profile 目录执行 `pnpm install`。
-4. 重启 DSH。宿主插件不会热重载。
+3. 在同一个文件的 `dsh.profile.bundles` 里加上 `@vlad/dsh-guardrails`。
+4. 在 profile 目录执行 `pnpm install`。干净机器上 `pnpm`（和 `node`）都不在 `PATH` 里——DSH 自带运行时——
+   所以用自带的那份：
+
+   ```powershell
+   $deps = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies" -Directory)[0]
+   & "$($deps.FullName)\node\bin\node.exe" "$($deps.FullName)\pnpm\bin\pnpm.mjs" install
+   ```
+
+5. 重启 DSH。宿主插件不会热重载。
 
 确认它挂上了：`~/.dsh/guardrails/loaded.json` 的修改时间是最近的、版本与
 `dsh-guardrails/package.json` 一致、且 `surface` 是 `"ok"`。**不要看 pid**——宿主进程会被替换，

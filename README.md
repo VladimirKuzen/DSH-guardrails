@@ -97,17 +97,26 @@ shape change shows up instead of looking healthy.
 
 Requires DSH on Windows. Developed and tested against DSH desktop `0.2.2-rc.1` on Windows 11; other host
 versions are untested. The package declares `engines.dsh: ">=0.2.0-0"`, but the host was not observed
-enforcing it. The package is not on a registry yet; link the checkout into a profile:
+enforcing it. The package is not on a registry yet, so link a checkout into a profile:
 
-1. Add the dependency to `%USERPROFILE%\.dsh\profiles\<profile>\package.json`:
+1. Clone the repository — `git clone https://github.com/VladimirKuzen/DSH-guardrails.git`. It is private while
+   it is being prepared for release, so this step needs access to it.
+2. Add the dependency to `%USERPROFILE%\.dsh\profiles\<profile>\package.json`:
 
    ```json
-   "@vlad/dsh-guardrails": "link:<absolute path to this repo>\\dsh-guardrails"
+   "@vlad/dsh-guardrails": "link:<absolute path to the checkout>\\dsh-guardrails"
    ```
 
-2. Add `@vlad/dsh-guardrails` to `dsh.profile.bundles` in the same file.
-3. Run `pnpm install` in the profile directory.
-4. Restart DSH. Host plugins do not hot-reload.
+3. Add `@vlad/dsh-guardrails` to `dsh.profile.bundles` in the same file.
+4. Run `pnpm install` in the profile directory. A clean machine has no `pnpm` (or `node`) on `PATH` — DSH
+   brings its own runtime — so call that copy:
+
+   ```powershell
+   $deps = (Get-ChildItem "$env:USERPROFILE\.dsh\dsh-runtimes\*\dependencies" -Directory)[0]
+   & "$($deps.FullName)\node\bin\node.exe" "$($deps.FullName)\pnpm\bin\pnpm.mjs" install
+   ```
+
+5. Restart DSH. Host plugins do not hot-reload.
 
 Verify it mounted: `~/.dsh/guardrails/loaded.json` should have a fresh mtime, a `version` matching
 `dsh-guardrails/package.json`, and `surface: "ok"`. **Do not trust the pid** — the host process can be

@@ -27,7 +27,8 @@
 - CI：`.github/workflows/test.yml` 在 `windows-latest` + Node 24 上跑全套测试与 `check` 冒烟
   （`git reset --hard` 必须退出 2）。两个 action 钉 commit SHA；包零依赖，所以没有安装步骤。
 - 首次 CI 运行全绿（2026-11-17），顺带说明 `npm test` 在真实 npm 下的结果与本机自带 Node 跑出来一致。
-- (安装一节的那条移到下一条提交)
+- 安装一节现在能在干净机器上照做：以 `git clone` 开头，`pnpm install` 一步改为调用 DSH 自带的 pnpm
+  （`~/.dsh/dsh-runtimes/*/dependencies/pnpm`）——裸装 Windows 上 `pnpm` 与 `node` 都不在 `PATH` 里。
 
 ## [1.5.0] — 2026-11-17
 

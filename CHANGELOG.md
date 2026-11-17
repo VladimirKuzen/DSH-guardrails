@@ -33,7 +33,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   the package has no dependencies.
 - The first CI run is green (2026-11-17), which also shows `npm test` behaves the same under real npm as under
   the bundled Node used locally.
-- (install-section bullet moves to the next commit)
+- The install section is followable on a clean machine: it starts with `git clone`, and the `pnpm install` step
+  calls the pnpm that DSH ships (`~/.dsh/dsh-runtimes/*/dependencies/pnpm`), because neither `pnpm` nor `node` is
+  on `PATH` after a plain Windows install.
 
 ## [1.5.0] — 2026-11-17
 
