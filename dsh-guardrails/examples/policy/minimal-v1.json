@@ -1,0 +1,11 @@
+{
+  "$schema": "../../policy.schema.json",
+  "version": 1,
+  "enabled": true,
+  "audit": { "format": "v2", "maxPayloadBytes": 65536 },
+  "rules": {
+    "protectDshHome": { "mode": "ask" },
+    "destructive": { "mode": "ask" },
+    "secrets": { "mode": "ask" }
+  }
+}

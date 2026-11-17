@@ -435,7 +435,7 @@ Get-Content args.json -Raw | & $node dsh-guardrails/tools/check.mjs --tool pwsh 
 | 2 | `lib/rules/r1-self.js` 自保护 + 合并 roots 文案 + `policy.schema.json` / `validate.js` / 启动校验 **（已完成 2026-11-16，见 §7.1）** | 小而加性；先于引擎重构落地 | 还原两个文件 + 重启 |
 | 3 | 引擎 v2（收集 + rank + `reasons[]` + entries + observe），`version:1` 完全走老路径 **（已完成 2026-11-17，见 §7.2）** | 最大一块，前面已有护栏 | 还原 `rules.js` + 重启 |
 | 4 | `tools/check.mjs` + `test/cli.test.mjs` + `bin` **（已完成 2026-11-17，见 §7.3）** | 依赖第 3 步的返回值形状 | 删文件 |
-| 5 | 文档：本文转正、`docs/threat-model.md` 补“非沙箱”与已知绕过、`design/p3-handoff.md` §6 加指针 | 计划 §6.2 第三条是文档交付项 | 还原 md |
+| 5 | 文档：`ARCHITECTURE.md` / `DSH-API.md` / `POLICY.md` 双语、`examples/policy/` 模板 + 测试、README 重写、本文转正 **（已完成 2026-11-17，见 §7.6）** | 计划 §6.2 第三条是文档交付项 | 还原 md |
 
 版本与 tag：全部完成后 `package.json` 升 **1.5.0**，打 `v1.5.0` + `p3`（annotated，写清验收日期）；每步一个小提交，消息写“改了什么、为什么”。`design/p3-handoff.md` §0 的版本/提交/tag 快照在收口时一并更新。
 
@@ -556,6 +556,25 @@ live 验收第 ③ 步（`entries` + `cwdUnder`）**静默不命中**：审计�
 - 测试：`test/plugin.smoke.mjs` 新增两条（`meta.cwd` 被记录并驱动 `cwdUnder` 命中；无 cwd 时只写一条 `config-invalid`）。
 
 实测：**16 个文件 394 条全绿**（rules 34、facts 29、describe 17、replay 3、critical 15、audit 11、quiet 19、dry-run 10、redact 9、self-protect 22、policy-schema 10、engine-v2 19、finalize 9、contract 73、cli 78、smoke 36）。
+
+### 7.6 第 ⑤ 步落地状态（2026-11-17，收口）
+
+文档交付按"文件结构 / 运行方式 / 宿主接口 / 自定义策略"四问组织，读的人不必先读设计文档：
+
+| 交付物 | 内容 |
+|---|---|
+| `dsh-guardrails/docs/ARCHITECTURE.md`（新） | 两棵树（仓库 vs 随包 `files`）逐文件职责、`locale/`（宿主读的插件元数据）与 `i18n/`（卡片文案）分工、分层图、一次调用 8 步、状态表、v1/v2 语义 |
+| `dsh-guardrails/docs/DSH-API.md`（新） | 依赖的每个宿主接口 + 假设 + "变了会怎样"；挂载自检（`ctx.on` → `surface`）；升级后五步核查；宿主不给插件做的事 |
+| `dsh-guardrails/docs/POLICY.md` / `POLICY.zh.md`（新） | 文件位置与优先级、五种 mode、放宽的四个手段与三档灰度、`entries` 写法、干跑、模板表、`check` 用法、常见错误码 |
+| `dsh-guardrails/examples/policy/`（新） | `minimal-v1` / `observe-first` / `tighten` / `relax-with-guard` 四份模板，`$schema` 指向包内 schema |
+| `dsh-guardrails/test/examples.test.mjs`（新，4 条） | 四份模板必须过 `validatePolicy`、`$schema` 必须真实存在、`entries` 只出现在 v2、放宽那份必须带 `deny` 捞回 |
+| `README.md` / `README.zh-CN.md` | 按 v2 与 1.5.0 重写：文档地图、规则表补 `R1 self` 与 `E`、配置示例改 `version: 2` + `rules.quiet` + `entries`、`check` 一节、审计补 `observed`/脱敏/`reasons`、仓库结构补 `lib/` `docs/` `examples/` `locale/`、测试数改 17 |
+| `dsh-guardrails/docs/DETAIL.md` / `DETAIL.zh.md` | 开头加三份文档的互链 |
+| `dsh-guardrails/index.js` | 挂载自检：`surfaceProblems` 只探 `ctx.on`，缺则 `surface: "degraded"` + 一次 `logger.error` + 直接返回；正常写 `surface: "ok"` |
+| `dsh-guardrails/test/plugin.smoke.mjs` | 两条挂载级用例（ok / degraded） |
+| `CHANGELOG.md` / `CHANGELOG.zh-CN.md` | `[Unreleased]` 定为 `[1.5.0] — 2026-11-17`，补文档、模板、`surface` 三条 |
+
+实测：**17 个文件 400 条全绿**（在原 16 个之上新增 `examples.test.mjs` 4 条，`plugin.smoke.mjs` 36 → 38）。
 
 ---
 

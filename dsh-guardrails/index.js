@@ -167,8 +167,18 @@ export function apply(ctx, config = {}) {
     ?? process.env.DSH_GUARDRAILS_POLICY
     ?? join(home, 'guardrails', 'policy.json');
 
+  /**
+   * The host surfaces this plugin stands on. Only the ones a plugin can see from
+   * its own context are probed here; a missing `ctx.on` means nothing would ever
+   * fire, so record that instead of looking mounted. Everything else (hook names,
+   * decision shapes, session fields) cannot be probed from inside — see
+   * `docs/DSH-API.md` for the list to re-check after a host upgrade.
+   */
+  const surfaceProblems = [];
+  if (typeof ctx?.on !== 'function') surfaceProblems.push('ctx.on');
+
   /** Rewrite the liveness marker; called on mount and on every audited call. */
-  const heartbeat = () => {
+  const writeHeartbeat = (extra = {}) => {
     try {
       mkdirSync(join(home, 'guardrails'), { recursive: true });
       writeFileSync(join(home, 'guardrails', 'loaded.json'), `${JSON.stringify({
@@ -176,11 +186,21 @@ export function apply(ctx, config = {}) {
         version: VERSION,
         policyPath,
         pid: process.pid,
+        surface: surfaceProblems.length === 0 ? 'ok' : 'degraded',
+        ...(surfaceProblems.length === 0 ? {} : { surfaceProblems }),
+        ...extra,
       }, null, 2)}\n`, 'utf8');
     } catch {
       // A failed heartbeat must not affect the gate.
     }
   };
+  const heartbeat = () => writeHeartbeat();
+
+  if (surfaceProblems.length > 0) {
+    ctx?.logger?.error?.(`guardrails: host surface incomplete (${surfaceProblems.join(', ')}); the gate cannot attach`);
+    writeHeartbeat();
+    return;
+  }
 
   let cache = { at: 0, mtime: -1, policy: buildPolicy(config.policy) };
 

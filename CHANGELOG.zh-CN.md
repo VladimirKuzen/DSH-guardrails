@@ -4,8 +4,17 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
-## [未发布]
+## [1.5.0] — 2026-11-17
 
+- 补上一套文档：[docs/POLICY.zh.md](dsh-guardrails/docs/POLICY.zh.md) 讲档位、`entries`、三步放宽法与模板；
+  [docs/ARCHITECTURE.md](dsh-guardrails/docs/ARCHITECTURE.md) 是文件地图、一次调用的路径与状态存放位置；
+  [docs/DSH-API.md](dsh-guardrails/docs/DSH-API.md) 列出它依赖的每个宿主接口、哪个接口变了会怎样、以及升级
+  DSH 后的五步核查。`README.zh-CN.md` 按 v2 重写，开头加了文档地图；仓库结构一节补上 `lib/`、`docs/`、
+  `i18n/`、`examples/` 与 `locale/`（最后这个是宿主读的插件元数据，别删）。
+- `dsh-guardrails/examples/policy/` 下的四份模板（`minimal-v1`、`observe-first`、`tighten`、
+  `relax-with-guard`）随包发布，并由 `test/examples.test.mjs` 校验，不会与 schema 漂移。
+- `loaded.json` 记录 `surface: "ok" | "degraded"`。缺 `ctx.on` 时挂载写入 degraded、记一次错误并直接返回，
+  不再假装挂载成功——宿主接口变了会当场显形，而不是看起来一切正常。
 - `cwdUnder` 条目改为从 session header 取工作区（`session.header.cwd`；`meta.cwd` 与 shell 调用自带的
   `workdir` 是兜底）。原先读 `session.cwd`，而本宿主从不填它，等于这类条目静默失效。策略里有
   `cwdUnder` 条目却拿不到 cwd 时，会写一条 `config-invalid` 记录说明，而不是继续沉默。

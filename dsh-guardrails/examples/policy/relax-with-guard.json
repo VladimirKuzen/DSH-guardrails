@@ -1,0 +1,26 @@
+{
+  "$schema": "../../policy.schema.json",
+  "version": 2,
+  "enabled": true,
+  "audit": { "format": "v2", "maxPayloadBytes": 65536 },
+  "rules": {
+    "protectDshHome": { "mode": "ask" },
+    "destructive": { "mode": "observe", "dryRun": { "enabled": true } },
+    "critical": { "mode": "deny", "failClosed": true },
+    "secrets": { "mode": "ask" }
+  },
+  "entries": [
+    {
+      "id": "keep-hard-reset",
+      "tool": ["pwsh", "bash"],
+      "mode": "deny",
+      "when": { "commandMatches": "^\\s*git\\s+reset\\s+--hard\\b" }
+    },
+    {
+      "id": "keep-recursive-delete",
+      "tool": ["pwsh", "bash"],
+      "mode": "deny",
+      "when": { "commandMatches": "^\\s*(rd|rmdir|Remove-Item)\\b(?=[\\s\\S]*(-Recurse|/s))" }
+    }
+  ]
+}

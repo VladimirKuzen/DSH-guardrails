@@ -6,6 +6,9 @@ written to a local audit file.
 
 Windows only.
 
+More: [POLICY.md](POLICY.md) for the modes, `entries` and templates; [ARCHITECTURE.md](ARCHITECTURE.md)
+for the file map; [DSH-API.md](DSH-API.md) for the host interfaces this depends on.
+
 ## What it watches
 
 | Rule | Fires when | Default |

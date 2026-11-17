@@ -4,8 +4,21 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
-## [Unreleased]
+## [1.5.0] — 2026-11-17
 
+- Documentation set: [docs/POLICY.md](dsh-guardrails/docs/POLICY.md) covers the modes, `entries`, the
+  three-step way to loosen a band and the templates; [docs/ARCHITECTURE.md](dsh-guardrails/docs/ARCHITECTURE.md)
+  is the file map, the per-call path and where state lives; [docs/DSH-API.md](dsh-guardrails/docs/DSH-API.md)
+  lists every host interface this depends on, what breaks when one moves, and the five checks after a DSH
+  upgrade. `README.md` was rewritten for v2 and now opens with a documentation map; the layout section
+  names `lib/`, `docs/`, `i18n/`, `examples/` and `locale/` (the last one is plugin metadata the host
+  reads — keep it).
+- Policy templates under `dsh-guardrails/examples/policy/` (`minimal-v1`, `observe-first`, `tighten`,
+  `relax-with-guard`) are shipped in the package and validated by `test/examples.test.mjs`, so they cannot
+  drift from the schema.
+- `loaded.json` records `surface: "ok" | "degraded"`. When `ctx.on` is missing the mount writes the
+  degraded state, logs one error and returns instead of pretending to be mounted — a host shape change now
+  shows up instead of looking healthy.
 - `cwdUnder` entries read the workspace from the session header (`session.header.cwd`; `meta.cwd` and a
   shell call's `workdir` are the fallbacks). It used to read `session.cwd`, which this host never populates,
   so a `cwdUnder` entry was silently inert. When a cwdUnder entry exists but no cwd can be resolved, one

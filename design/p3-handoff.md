@@ -76,3 +76,7 @@ live 验收最少三条：① `Get-Date` 无卡放行；② critical（如 `cmd 
 先只读：`design/p2-audit-v2.md` 的事件模型 + `lib/rules/kit.js` 的规则表 + `index.js` 的三个监听。
 然后给一份 P3 设计草案（策略 v2 的字段形状、优先级怎么实现、自保护放在哪一层、`check` 的退出码语义），
 **不要先改代码**——P3 会动到判定顺序与审计契约，设计错一次要回滚两次。
+
+**2026-11-17 更新：本文已过期。** P3 已按 `design/p3-policy-v2.md` 完成并收口到 1.5.0
+（五步的落地状态见该文 §7.1–§7.6，live 验收证据见各节末尾）；接手时先读该文的 §7.6 与
+`dsh-guardrails/docs/ARCHITECTURE.md`。

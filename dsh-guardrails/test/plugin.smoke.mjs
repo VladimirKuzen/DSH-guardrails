@@ -635,4 +635,20 @@ test('cwd: a cwdUnder entry that cannot see a cwd is reported once, not silently
   assert.match(warnings[0].detail, /cwdUnder/);
 });
 
+function marker() {
+  return JSON.parse(readFileSync(join(dir, '.dsh', 'guardrails', 'loaded.json'), 'utf8'));
+}
+
+test('mount: the liveness marker reports the host surface it found', () => {
+  fakeCtx();
+  assert.equal(marker().surface, 'ok');
+  assert.equal(marker().surfaceProblems, undefined);
+});
+
+test('mount: a context without the hook surface is recorded as degraded, not mounted', () => {
+  apply({ logger: { warn() {} } }, {});
+  assert.equal(marker().surface, 'degraded');
+  assert.deepEqual(marker().surfaceProblems, ['ctx.on']);
+});
+
 

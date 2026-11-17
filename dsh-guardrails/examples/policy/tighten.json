@@ -1,0 +1,29 @@
+{
+  "$schema": "../../policy.schema.json",
+  "version": 2,
+  "enabled": true,
+  "audit": { "format": "v2", "maxPayloadBytes": 65536 },
+  "rules": {
+    "protectDshHome": { "mode": "ask" },
+    "destructive": { "mode": "ask", "dryRun": { "enabled": true } },
+    "critical": { "mode": "deny", "failClosed": true, "patterns": ["(?i)\\bformat\\s+[a-z]:"] },
+    "secrets": { "mode": "ask" }
+  },
+  "entries": [
+    {
+      "id": "no-force-push",
+      "tool": ["pwsh", "bash"],
+      "mode": "deny",
+      "when": {
+        "cwdUnder": ["D:\\work\\proj"],
+        "commandMatches": "^\\s*git\\s+push\\b(?=[\\s\\S]*--force)"
+      }
+    },
+    {
+      "id": "no-git-metadata-writes",
+      "tool": ["write", "edit", "create_file", "apply_patch"],
+      "mode": "deny",
+      "when": { "targetUnder": ["D:\\work\\proj\\.git"] }
+    }
+  ]
+}

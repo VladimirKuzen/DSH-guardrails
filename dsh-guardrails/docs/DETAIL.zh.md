@@ -5,6 +5,9 @@
 
 仅支持 Windows。
 
+更多：[POLICY.zh.md](POLICY.zh.md) 讲档位、`entries` 与模板；[ARCHITECTURE.md](ARCHITECTURE.md) 是文件地图；
+[DSH-API.md](DSH-API.md) 列出它依赖的宿主接口。
+
 ## 它盯什么
 
 | 规则 | 触发条件 | 默认 |

@@ -1,6 +1,6 @@
 {
   "name": "@vlad/dsh-guardrails",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "private": true,
   "description": "Blocks risky DSH tool calls before they run: protects DSH's own home, stops destructive shell commands, and flags secrets in tool arguments. Windows only.",
   "license": "MIT",
@@ -34,11 +34,12 @@
     "i18n",
     "locale/*.json",
     "docs",
+    "examples",
     "tools",
     "icon.svg"
   ],
   "scripts": {
-    "test": "node test/rules.test.mjs && node test/facts.test.mjs && node test/describe.test.mjs && node test/replay.test.mjs && node test/critical.test.mjs && node test/audit.test.mjs && node test/quiet.test.mjs && node test/finalize.test.mjs && node test/dry-run.test.mjs && node test/redact.test.mjs && node test/self-protect.test.mjs && node test/policy-schema.test.mjs && node test/engine-v2.test.mjs && node test/contract.test.mjs && node test/cli.test.mjs && node test/plugin.smoke.mjs"
+    "test": "node test/rules.test.mjs && node test/facts.test.mjs && node test/describe.test.mjs && node test/replay.test.mjs && node test/critical.test.mjs && node test/audit.test.mjs && node test/quiet.test.mjs && node test/finalize.test.mjs && node test/dry-run.test.mjs && node test/redact.test.mjs && node test/self-protect.test.mjs && node test/policy-schema.test.mjs && node test/engine-v2.test.mjs && node test/contract.test.mjs && node test/examples.test.mjs && node test/cli.test.mjs && node test/plugin.smoke.mjs"
   },
   "dsh": {
     "bundle": {
