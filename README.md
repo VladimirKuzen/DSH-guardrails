@@ -155,6 +155,9 @@ replaced while the gate keeps working in a new one. Freshness plus version (plus
 }
 ```
 
+`D:\work\guardrails` in the example, and the paths in the commands on this page, are placeholders — swap in
+a directory that exists on your machine.
+
 `patterns` appends your own regular expressions to the built-in lists. `critical.patterns` adds your own
 regexes to the hard-stop tier; `critical.failClosed` keeps that tier closed when evaluation itself throws.
 A corrupt policy file is ignored in favour of the last good copy — the gate never disappears because of a
