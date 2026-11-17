@@ -25,6 +25,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   subdirectory), `homepage` and `bugs` point at the GitHub repository. `private` stays on until the
   repository becomes public, so nothing is publishable yet. The README now names the host version this was
   tested on: DSH desktop `0.2.2-rc.1`.
+- `dsh-guardrails/` now ships its own `README.md` and `LICENSE`. npm only includes files from the package
+  directory, so the tarball previously carried neither the readme the npm page renders nor the license text.
+  `pnpm pack` now shows 40 entries, with no `test/` or `design/` files.
 
 ## [1.5.0] — 2026-11-17
 

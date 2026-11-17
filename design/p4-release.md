@@ -179,6 +179,10 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
       2026-11-17T14:36:47Z）。**没有观察到宿主校验 `engines.dsh`**，所以 README 按"仅在 0.2.2-rc.1 上测过、
       其他版本未测"写明，不声称已验证范围语义。
 - [x] 双语 README 的安装一节写明测试过的宿主版本；`CHANGELOG` 的 `[Unreleased]` 补一条。
+- [x] 打包自检（本机没有 `npm`，用 bundled pnpm）：首轮 `pnpm pack` 为 38 条、白名单文件齐全，但 tarball 里
+      **没有 `README`/`LICENSE`**——两者都在仓库根，而 npm 只收包目录里的文件。已在 `dsh-guardrails/`
+      内补一份包级 `README.md` 与 `LICENSE` 副本，重新打包后多出 `package/README.md` 与 `package/LICENSE`
+      （共 40 条），`test/`、`design/` 仍为 0 条。
 
 证据（2026-11-17 22:53）：`node -e` 解析 `package.json` 通过；全套 18 文件 404 条仍全绿。
 

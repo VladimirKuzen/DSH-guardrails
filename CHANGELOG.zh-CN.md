@@ -22,6 +22,8 @@
 - 包元数据：`repository`（带 `"directory": "dsh-guardrails"`，因为包在子目录里）、`homepage`、`bugs`
   指向 GitHub 仓库。`private` 保留到仓库公开，所以现在还发布不了。README 写明实际验证过的宿主版本：
   DSH desktop `0.2.2-rc.1`。
+- `dsh-guardrails/` 现在自带 `README.md` 与 `LICENSE`：npm 只收包目录里的文件，之前的 tarball 既没有 npm
+  页面要显示的 readme，也没有许可证正文。现在 `pnpm pack` 为 40 个条目，不含 `test/` 与 `design/`。
 
 ## [1.5.0] — 2026-11-17
 
