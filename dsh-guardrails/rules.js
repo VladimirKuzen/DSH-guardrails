@@ -146,11 +146,14 @@ function evaluateV2(policy, call, env, rules) {
     ...(entryId === undefined ? {} : { entryId }),
   }));
 
+  const reasonsTruncated = candidates.length > MAX_REASONS;
+
   return {
     ...winner,
     reasons,
     secretHit,
     policyVersion: 2,
+    ...(reasonsTruncated ? { reasonsTruncated: true } : {}),
     ...(winner.mode === 'observe' ? { observed: true } : {}),
   };
 }

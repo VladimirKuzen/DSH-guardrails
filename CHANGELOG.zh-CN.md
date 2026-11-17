@@ -43,6 +43,10 @@
   不写审计：它只是提问，不是执行。
 - “工作区静默放行”的判定挪进 `lib/finalize.js`，宿主、契约 runner 与 CLI 共用，三处不会再各写一遍而漂移。
 - `test/engine-v2.test.mjs` 原先没接进 `npm test` 的测试链，现已接上；CLI 作为第二个 runner 重放整张契约表。
+- 密钥不再留哈希：低熵密钥（`password=hunter2`）的哈希就是一个可离线爆破的校验值，所以密钥记录现在只写
+  `payloadBytes`。`observe` 下先把命中片段换成 `<redacted:标签>` 再落盘，落盘前复扫仍有命中就整条不写，
+  `redacted` 记下被替换的形状（`lib/redact.js`、`test/redact.test.mjs`）。
+- `reasonsTruncated` 标记“`reasons[]` 在第 8 条被截断”，读者因此分得清“只命中一条”和“命中了十条”。
 
 ## [1.4.0] - 2026-11-15
 

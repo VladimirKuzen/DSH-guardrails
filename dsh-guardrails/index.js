@@ -134,11 +134,23 @@ function auditTarget(exec, verdict) {
   return raw === '' ? null : truncateCodePoints(escapeControl(raw), MAX_TARGET).text;
 }
 
-/** Full text of the operation; R3 stores no payload, only its hash. */
-function payloadOf(exec, verdict) {
+/**
+ * Full text of the operation. A secret keeps the R3 track: never stored, never
+ * hashed — except under observe, where the text is stored with the secret runs
+ * replaced (`lib/redact.js`) so the call can still be reviewed later.
+ */
+function payloadOf(exec, verdict, policy) {
   const args = exec?.arguments ?? {};
   const text = typeof args.command === 'string' ? args.command : JSON.stringify(args, null, 2);
-  return { payload: text, secret: verdict.rule === 'R3' || verdict.secretHit === true };
+  return {
+    payload: text,
+    secret: verdict.rule === 'R3' || verdict.secretHit === true,
+    // Only observe may spill a payload that contains a secret; deny and ask
+    // paths must leave no text and no verifiable hash behind.
+    spill: verdict.observed === true,
+    // Policy patterns are redacted with the same list the detector used.
+    patterns: policy?.rules?.secrets?.patterns ?? [],
+  };
 }
 
 export function apply(ctx, config = {}) {
@@ -312,6 +324,7 @@ export function apply(ctx, config = {}) {
     // v2 only: which user entry fired, and every band that matched.
     ...(verdict.entryId === undefined ? {} : { entryId: verdict.entryId }),
     ...(verdict.reasons === undefined ? {} : { reasons: verdict.reasons }),
+    ...(verdict.reasonsTruncated === true ? { reasonsTruncated: true } : {}),
     mode: verdict.mode,
     ...(verdict.severity === undefined ? {} : { severity: verdict.severity }),
     target: auditTarget(exec, verdict),
@@ -321,9 +334,9 @@ export function apply(ctx, config = {}) {
   });
 
   /** `requested` + `outcome` for calls the guard refuses without a card. */
-  const recordRefusal = (exec, verdict, fields) => {
+  const recordRefusal = (exec, verdict, fields, policy) => {
     const id = randomUUID();
-    const payload = payloadOf(exec, verdict);
+    const payload = payloadOf(exec, verdict, policy);
     emit({ id, event: 'requested', ...fields, delivered: false, ...payload });
     emit({ id, event: 'outcome', ...fields, outcome: 'denied', source: 'guardrail' });
     return id;
@@ -378,7 +391,7 @@ export function apply(ctx, config = {}) {
           } catch {
             // A failed audit write must not cancel the refusal
           }
-          recordRefusal(exec, fallback, fallbackFields);
+          recordRefusal(exec, fallback, fallbackFields, policy);
           heartbeat();
           return { kind: 'deny', reason: fallback.reason, info: { name: 'GuardrailsDenied', code: fallback.rule } };
         }
@@ -468,10 +481,11 @@ export function apply(ctx, config = {}) {
     const fields = fieldsFor(exec, verdict, facts, displayReason);
 
     // Engine v2 observe: record, then let the call through. No card, no refusal.
-    // The payload still follows the R3 rule, so an observed secret is hashed only.
+    // An observed secret is stored with every secret run replaced by
+    // `<redacted:LABEL>`; the re-scan decides whether anything is stored at all.
     if (verdict.mode === 'observe') {
       if (usesV2()) {
-        emit({ id: randomUUID(), event: 'observed', ...fields, ...payloadOf(exec, verdict) });
+        emit({ id: randomUUID(), event: 'observed', ...fields, ...payloadOf(exec, verdict, policy) });
       }
       heartbeat();
       return next();
@@ -479,7 +493,7 @@ export function apply(ctx, config = {}) {
 
     if (verdict.mode === 'allow') {
       if (usesV2()) {
-        emit({ id: randomUUID(), event: 'allowed', ...fields, quiet: verdict.quiet ?? null, ...payloadOf(exec, verdict) });
+        emit({ id: randomUUID(), event: 'allowed', ...fields, quiet: verdict.quiet ?? null, ...payloadOf(exec, verdict, policy) });
       } else {
         try {
           auditV1(auditDir(), {
@@ -500,14 +514,14 @@ export function apply(ctx, config = {}) {
 
     if (usesV2()) {
       if (verdict.mode === 'deny') {
-        recordRefusal(exec, verdict, fields);
+        recordRefusal(exec, verdict, fields, policy);
       } else {
         prunePending();
         const id = randomUUID();
         if (exec?.callId !== undefined) {
           pending.set(exec.callId, { id, at: Date.now(), callId: exec.callId, approvalRequestId: undefined, approvalOutcome: undefined, fields });
         }
-        emit({ id, event: 'requested', ...fields, delivered: false, ...payloadOf(exec, verdict) });
+        emit({ id, event: 'requested', ...fields, delivered: false, ...payloadOf(exec, verdict, policy) });
       }
     } else {
       try {

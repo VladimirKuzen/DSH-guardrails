@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mkdtempSync, writeFileSync, readFileSync, readdirSync, rmSync, existsSync, mkdirSync } from 'node:fs';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -164,7 +165,9 @@ test('R3 shell deny never writes the secret or its payload', async () => {
   assert.ok(!all.includes(secret), 'audit must not contain the secret');
   const record = auditLines().find((r) => r.rule === 'R3');
   assert.equal(record.payloadRef, null);
-  assert.match(record.payloadSha256, /^[0-9a-f]{64}$/);
+  // No hash either: a hash of a low-entropy secret is a dictionary oracle.
+  assert.equal(record.payloadSha256, null);
+  assert.ok(record.payloadBytes > 0);
 });
 
 test('R3 secret write still asks and hides the value', async () => {
@@ -415,6 +418,24 @@ test('v2 entry deny: refusal is audited as rule E with its entryId', async () =>
   assert.ok(Array.isArray(record.reasons) && record.reasons.some((reason) => reason.rule === 'E'));
 });
 
+test('v2: more than eight matches keep the count in the record', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy(v2Policy({
+    entries: Array.from({ length: 10 }, (_, index) => ({
+      id: `watch-${index}`,
+      tool: ['pwsh'],
+      mode: 'observe',
+      when: { commandMatches: '^\\s*Remove-Item\\b' },
+    })),
+  }));
+  const ctx = fakeCtx();
+  await ctx.pre(callAs('sv-3', 'pwsh', { command: 'Remove-Item -Recurse D:\\work\\dist' }, 'cv3'), next);
+  const record = auditLines().find((r) => r.callId === 'cv3' && r.event === 'requested');
+  assert.ok(record, JSON.stringify(auditLines()));
+  assert.equal(record.reasons.length, 8);
+  assert.equal(record.reasonsTruncated, true);
+});
+
 test('v2 entry ask: the card says the rule in words, the record keeps the id', async () => {
   writePolicy(v2Policy({
     entries: [{ id: 'review-npm-install', tool: ['pwsh'], mode: 'ask', when: { commandMatches: '^\\s*npm (install|ci)\\b' } }],
@@ -439,22 +460,45 @@ test('v2 observe: the call passes, is recorded as observed, and shows no card', 
   assert.ok(record.payloadRef.startsWith('payload/'));
 });
 
-test('v2 observed secret: recorded, never stored', async () => {
+test('v2 observed secret: stored with the secret run replaced', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
   writePolicy(v2Policy({ rules: { secrets: { mode: 'observe' } } }));
   const ctx = fakeCtx();
+  const token = 'sk-proj-abcdefghijklmnopqrstuvwx';
   const decision = await ctx.pre(
-    callAs('sv-4', 'write', { file_path: 'D:\\work\\cfg.txt', content: 'key=sk-proj-abcdefghijklmnopqrstuvwx' }, 'cv4'),
+    callAs('sv-4', 'write', { file_path: 'D:\\work\\cfg.txt', content: `key=${token}` }, 'cv4'),
     next,
   );
   assert.equal(decision.kind, 'allow');
   const record = auditLines().find((r) => r.callId === 'cv4');
   assert.equal(record.event, 'observed');
   assert.equal(record.rule, 'R3');
-  assert.equal(record.payloadRef, null);
-  assert.match(record.payloadSha256, /^[0-9a-f]{64}$/);
+  assert.deepEqual(record.redacted, ['openai']);
+  assert.ok(record.payloadRef.startsWith('payload/'), 'the redacted text should be stored');
+  const stored = readFileSync(join(dir, 'audit', 'v2', record.payloadRef), 'utf8');
+  assert.equal(stored.includes(token), false);
+  assert.equal(stored.includes('<redacted:openai>'), true);
+  // The hash is over the stored (redacted) bytes, never over the original.
+  const sha = createHash('sha256').update(Buffer.from(stored, 'utf8')).digest('hex');
+  assert.equal(record.payloadSha256, sha);
 });
 
-test('v2: a secret inside a denied call is hashed, never written', async () => {
+test('v2 observed secret: stores nothing when the re-scan still matches', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  // A policy pattern that also matches the placeholder: redaction cannot be
+  // trusted, so the payload is dropped entirely (fail closed).
+  writePolicy(v2Policy({ rules: { secrets: { mode: 'observe', patterns: ['redacted'] } } }));
+  const ctx = fakeCtx();
+  const token = 'sk-proj-abcdefghijklmnopqrstuvwx';
+  const decision = await ctx.pre(callAs('sv-4b', 'write', { file_path: 'D:\\work\\cfg.txt', content: `key=${token}` }, 'cv4b'), next);
+  assert.equal(decision.kind, 'allow');
+  const record = auditLines().find((r) => r.callId === 'cv4b');
+  assert.equal(record.payloadRef, null);
+  assert.equal(record.payloadSha256, null);
+  assert.ok(record.redacted.includes('openai'));
+});
+
+test('v2: a secret inside a denied call is neither written nor hashed', async () => {
   rmSync(join(dir, 'audit'), { recursive: true, force: true });
   writePolicy(v2Policy({ rules: { secrets: { mode: 'observe' }, destructive: { mode: 'deny' } } }));
   const ctx = fakeCtx();
@@ -464,7 +508,9 @@ test('v2: a secret inside a denied call is hashed, never written', async () => {
   const record = auditLines().find((r) => r.callId === 'cv5');
   assert.equal(record.rule, 'R2');
   assert.equal(record.payloadRef, null);
-  assert.match(record.payloadSha256, /^[0-9a-f]{64}$/);
+  // A hash of the original would be a dictionary oracle for weak secrets.
+  assert.equal(record.payloadSha256, null);
+  assert.ok(record.payloadBytes > 0);
   for (const file of readdirSync(join(dir, 'audit'), { recursive: true })) {
     const path = join(dir, 'audit', file);
     try {

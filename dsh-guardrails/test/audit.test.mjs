@@ -85,13 +85,14 @@ test('payloads over the cap are truncated on disk but hashed in full', () => {
   assert.equal(readFileSync(join(dir, record.payloadRef), 'utf8'), 'abcd');
 });
 
-test('secret payloads keep the hash but write no file', () => {
+test('secret payloads write no file and no hash', () => {
   const dir = join(root, 'secret');
   const log = new AuditLog({ dir, now });
   const record = log.append({ id: 'op-3', event: 'requested', payload: 'sk-test-secret', secret: true });
   assert.equal(record.payloadRef, null);
   assert.equal(record.payloadBytes, 14);
-  assert.match(record.payloadSha256, /^[0-9a-f]{64}$/);
+  // A hash of a low-entropy secret is a dictionary oracle, so there is none.
+  assert.equal(record.payloadSha256, null);
   assert.equal(existsSync(join(dir, 'payload')), false);
 });
 

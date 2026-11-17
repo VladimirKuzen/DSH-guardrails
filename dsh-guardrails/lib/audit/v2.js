@@ -18,6 +18,7 @@
 
 import { appendFileSync, closeSync, existsSync, ftruncateSync, mkdirSync, openSync, readFileSync, readSync, renameSync, statSync, writeFileSync } from 'node:fs';
 import { createHash, randomUUID } from 'node:crypto';
+import { redactSecrets } from '../redact.js';
 import { join } from 'node:path';
 
 const GENESIS = 'genesis';
@@ -151,6 +152,7 @@ export class AuditLog {
       ...(input.sub === undefined ? {} : { sub: input.sub }),
       ...(input.entryId === undefined ? {} : { entryId: input.entryId }),
       ...(input.reasons === undefined ? {} : { reasons: input.reasons }),
+      ...(input.reasonsTruncated === true ? { reasonsTruncated: true } : {}),
       mode: input.mode ?? null,
       ...(input.severity === undefined ? {} : { severity: input.severity }),
       target: input.target ?? null,
@@ -161,6 +163,8 @@ export class AuditLog {
       payloadSha256: payload.sha256,
       payloadBytes: payload.bytes,
       payloadTruncated: payload.truncated,
+      // Which secret kinds were replaced in the stored payload, if any.
+      ...(payload.redacted === undefined || payload.redacted.length === 0 ? {} : { redacted: payload.redacted }),
       ...(input.delivered === undefined ? {} : { delivered: input.delivered }),
       ...(input.approvalRequestId === undefined ? {} : { approvalRequestId: input.approvalRequestId }),
       ...(input.deliveredAt === undefined ? {} : { deliveredAt: input.deliveredAt }),
@@ -183,21 +187,52 @@ export class AuditLog {
 
   writePayload(input, day, id) {
     const text = typeof input.payload === 'string' ? input.payload : '';
-    if (text === '') return { ref: null, sha256: null, bytes: null, truncated: false };
-    const raw = Buffer.from(text, 'utf8');
+    if (text === '') return { ref: null, sha256: null, bytes: null, truncated: false, redacted: [] };
+
+    // Not a secret: store the text as-is (the pre-P3 behaviour).
+    if (input.secret !== true) {
+      const raw = Buffer.from(text, 'utf8');
+      const truncated = raw.length > this.maxPayloadBytes;
+      const dir = join(this.dir, 'payload', day);
+      mkdirSync(dir, { recursive: true });
+      writeFileSync(join(dir, `${id}.txt`), truncated ? raw.subarray(0, this.maxPayloadBytes) : raw);
+      return {
+        ref: `payload/${day}/${id}.txt`,
+        sha256: createHash('sha256').update(raw).digest('hex'),
+        bytes: raw.length,
+        truncated,
+        redacted: [],
+      };
+    }
+
+    // A secret that must not spill (deny / ask paths): no text, and no hash of
+    // the text either. A hash answers "was it exactly this?" for free, which is
+    // a dictionary oracle for low-entropy secrets (password=hunter2).
+    if (input.spill !== true) {
+      return { ref: null, sha256: null, bytes: Buffer.byteLength(text), truncated: false, redacted: [] };
+    }
+
+    // The observe path: redact first, re-scan, then truncate, then hash the
+    // redacted bytes. Truncating first would let a half-cut secret slip past the
+    // replacement; hashing the original would be a verification channel again.
+    const { text: safe, labels, clean } = redactSecrets(text, input.patterns ?? []);
+    if (!clean) {
+      // Redaction and detection disagreed: store nothing but the fact that it
+      // happened and how long the original was.
+      return { ref: null, sha256: null, bytes: Buffer.byteLength(text), truncated: false, redacted: labels };
+    }
+    const raw = Buffer.from(safe, 'utf8');
     const truncated = raw.length > this.maxPayloadBytes;
-    const base = {
-      sha256: createHash('sha256').update(raw).digest('hex'),
-      bytes: raw.length,
-      truncated,
-    };
-    // Secrets are provable by hash and never stored: the record still answers
-    // "what exactly ran" without keeping the credential on disk.
-    if (input.secret === true) return { ref: null, ...base };
     const dir = join(this.dir, 'payload', day);
     mkdirSync(dir, { recursive: true });
     writeFileSync(join(dir, `${id}.txt`), truncated ? raw.subarray(0, this.maxPayloadBytes) : raw);
-    return { ref: `payload/${day}/${id}.txt`, ...base };
+    return {
+      ref: `payload/${day}/${id}.txt`,
+      sha256: createHash('sha256').update(raw).digest('hex'),
+      bytes: raw.length,
+      truncated,
+      redacted: labels,
+    };
   }
 
   readChain() {

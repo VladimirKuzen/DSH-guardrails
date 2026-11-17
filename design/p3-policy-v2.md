@@ -170,17 +170,19 @@ evaluate(policy, call, env):
   rule: 'R2', mode: 'ask', reason,            // 兼容旧字段 = 赢家
   severity?, label?, target?,
 
-  reasons: [                                   // 新增：全部命中
-    { rule, decision, entryId?, severity?, label?, reason }
+  reasons: [                                   // 新增：全部命中（最多 8 条）
+    { rule, mode, sub?, severity?, entryId? }
   ],
+  reasonsTruncated: true,                      // 新增：命中超过 8 条时才有
   secretHit: true,                             // 新增：只要 reasons 里有 R3 就 true
-  observed: false,                             // 新增：赢家是 observe 时 true
+  observed: true,                              // 新增：赢家是 observe 时才有
   policyVersion: 2                             // 新增
 }
 ```
 
+- `reasons[]` 的字段名以实现为准（2026-11-17 核对）：用 `mode` 而不是 `decision`，用 `sub` 区分子带（如 `sub: 'self'`），不带 `reason` 文案。`reasons` / `reasonsTruncated` 在 `fieldsFor()` 与 `lib/audit/v2.js` 的白名单里各写一次——漏一处就会被静默丢弃（`sub` 2026-11-17 就踩过）。
 - `reasons[]` **只进审计**，不进卡片。卡片仍是 `describe()` 的一行（`dsh-guardrails/lib/describe.js:64-104` 只吃赢家 + facts）。
-- 消费方要改的三处都在 `dsh-guardrails/index.js`：`auditTarget`（:124）、`payloadOf`（:135）、`fieldsFor`（:254）。
+- 消费方要改的三处都在 `dsh-guardrails/index.js`：`auditTarget`、`payloadOf`、`fieldsFor`。
 
 ### 2.6 四条必须写死的钳制（优先级不得覆盖）
 
@@ -205,7 +207,9 @@ evaluate(policy, call, env):
 - `auditTarget` 走今天 R3 的分支（只写 `file_path`，或写脱敏后的标签）；
 - `payloadOf` 返回 `secret: true`，原文不落盘。
 
-**实测补充（2026-11-16 R3 探针）**：今天 R3 拒绝时 `payloadRef: null` 但**仍写 `payloadSha256`**（对原文算的 `sha256`）+ `payloadBytes`。`write` 的 ask 路径同样如此（`payloadRef: null`、`payloadBytes: 217`、哈希在），说明这不是拒绝路径的个例。对高熵密钥无害，对低熵命中（`password=hunter2`、短内网 token）这等于在盘上留了一个可字典反推的校验值。v2 建议 **R3 命中时 `payloadSha256` 也置 `null`**，只留 `payloadBytes` 表达"拦下了多长的一条"；链完整性由记录自身的 `prevHash` 保证，不依赖 payload 哈希。
+**实测补充（2026-11-16 R3 探针）**：今天 R3 拒绝时 `payloadRef: null` 但**仍写 `payloadSha256`**（对原文算的 `sha256`）+ `payloadBytes`。`write` 的 ask 路径同样如此（`payloadRef: null`、`payloadBytes: 217`、哈希在），说明这不是拒绝路径的个例。对高熵密钥无害，对低熵命中（`password=hunter2`、短内网 token）这等于在盘上留了一个可字典反推的校验值。v2 要求 **R3 命中时 `payloadSha256` 也置 `null`**，只留 `payloadBytes` 表达"拦下了多长的一条"；链完整性由记录自身的 `prevHash` 保证，不依赖 payload 哈希。
+
+**已实现（2026-11-17）**：`dsh-guardrails/lib/audit/v2.js` 的 `writePayload()` 现在三分支——非密钥原样存；`secret && !spill` → `{ref:null, sha256:null, bytes}`；`secret && spill`（observe）→ 脱敏后才可能有哈希，见 §2.6 第 4 条。`payloadSha256` 为 `null` 已由 `test/audit.test.mjs` 与 `test/plugin.smoke.mjs` 各锁一条。
 
 **这两个判断必须从“赢家是 R3”改成“命中过 R3”。** 否则 v2 多命中时，一条命令同时含 token 和 `reg delete`，赢家是 R2c，payload 就把密钥原文写盘了。这是本设计最危险的一处，必须有专门回归断言（§8 第 6 条）。
 
@@ -215,7 +219,7 @@ evaluate(policy, call, env):
 
 ```
 verdict.mode === 'ask'
-&& reasons.every(r => r.rule === 'R2' && r.severity === undefined && r.decision === 'review')
+&& reasons.every(r => r.rule === 'R2' && r.severity === undefined && r.mode === 'ask')
 && verdict.secretHit === false
 ```
 
@@ -225,12 +229,14 @@ verdict.mode === 'ask'
 
 observe 命中 R3 时，payload 必须先脱敏再落盘：
 
-- 用**与检测同一份** `DEFAULT_SECRETS` 把命中片段替换为 `<redacted:LABEL>`（LABEL 取规则名，如 `<redacted:openai-key>`），保留 label 与命中长度两个事实，其余字符不动；
+- 用**与检测同一份** `DEFAULT_SECRETS`（外加 `rules.secrets.patterns`）把命中片段替换为 `<redacted:LABEL>`，LABEL 取 `labelFor()` 的规则名（如 `<redacted:openai>`），**不保留命中长度**——长度本身就是侧信道；
 - 脱敏在**截断之前**执行（否则截断点上的半截密钥会逃过替换）；
-- 落盘前**再扫一遍脱敏结果**：仍有任何 `DEFAULT_SECRETS` 命中 → 整条 payload 不写（`payloadRef: null`），只留 `redacted: ["openai-key"]` 与 `payloadBytes`；
+- 落盘前**再扫一遍脱敏结果**：仍有任何 pattern 命中 → 整条 payload 不写（`payloadRef: null`、`payloadSha256: null`），只留 `redacted: ["openai"]` 与 `payloadBytes`；
 - `payloadSha256` 对**脱敏后**文本计算，文档写明（否则哈希就成了原文的校验通道）。
 
 理由：检测与脱敏不可能永远同构（大小写变体、多规则重叠、截断边界），所以“脱敏”不能当唯一防线，必须配“复扫失败即不写”的失败关闭。
+
+**已实现（2026-11-17）**：`dsh-guardrails/lib/redact.js` 的 `redactSecrets(text, extraPatterns)` → `{ text, labels, clean }`；`writePayload()` 在 `secret && spill` 分支调用它，`clean === false` 时整条不写。注意一处与设计初稿的偏离：`key=value` 形状把**整段**替换成占位符（键名也一起走），理由是"判断哪一部分只是键名"需要启发式，而启发式在脱敏器里就是漏点；`test/redact.test.mjs` 锁住了这个行为。
 
 ### 2.7 observe 的审计事件
 
@@ -517,6 +523,21 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 
 **过程中发现的一个真问题**：`test/engine-v2.test.mjs` 从来没进过 `package.json` 的测试链——17 条 v2 测试写了、跑过，但 `npm test` 不跑。这类“存在但没接上”的测试比没有更糟，因为它让人以为被覆盖了。
 
+### 7.4 第 ⑤ 步之前的缺口修复（2026-11-17）
+
+通读本文与代码后发现的“文档写了、代码没写”的四处，已全部补齐：
+
+| 缺口 | 文档位置 | 实现 |
+|---|---|---|
+| G1 observe 下的 R3 payload 从未脱敏（`secret` 分支直接 `ref: null`，全库无 `redact`） | §2.6-4、§2.7 | 新增 `lib/redact.js`：`redactSecrets(text, extraPatterns)` → `{ text, labels, clean }`；`writePayload()` 的 `secret && spill` 分支先脱敏再截断，`clean === false` 时整条不写；`append()` 白名单加 `redacted` |
+| G2 密钥记录仍写原文 `sha256` | §2.6-2、§9 风险 19 | `secret && !spill` → `{ref:null, sha256:null, bytes}`；`test/audit.test.mjs`、`test/plugin.smoke.mjs` 各锁一条 |
+| G3 `reasonsTruncated` 从未置位 | §2.5 | `rules.js` 在 `candidates.length > MAX_REASONS` 时置 `reasonsTruncated: true`；`fieldsFor()` 与 `lib/audit/v2.js` 白名单各加一行；`engine-v2.test.mjs` 与 `plugin.smoke.mjs` 各一条（10 条 observe 条目 → 8 条 reasons + 截断标记） |
+| G4 `reasons[]` 字段名与文档不符 | §2.5 | 文档已按实现改正（`mode` 而非 `decision`，多 `sub`，无 `reason`） |
+
+一处与设计初稿的主动偏离：`key=value` 形状**整段**替换（键名也一起走），理由是"判断哪一部分只是键名"需要启发式，而启发式在脱敏器里就是漏点；`test/redact.test.mjs` 锁住该行为。
+
+实测：`lib/redact.js` 9 条、`test/plugin.smoke.mjs` 32 条、`test/engine-v2.test.mjs` 19 条、`test/audit.test.mjs` 11 条；**15 个文件 370 条全绿**（rules 34、facts 26、describe 17、replay 3、critical 15、audit 11、quiet 19、dry-run 10、redact 9、self-protect 22、policy-schema 9、engine-v2 19、contract 70、cli 77、smoke 32）。
+
 ---
 
 ## 8. 验收矩阵（可执行条目）
@@ -531,7 +552,7 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 8. **v1 零变化**：`~/.dsh/guardrails/policy.json` 保持 `version:1` 时，128 条既有测试全绿且 `check` 输出与 1.4.0 行为一致。
 9. **live 三条**：`Get-Date` 无卡；`cmd /c "reg delete HKLM\SYSTEM\X /f"` 无卡拒绝；一条普通删除弹卡。随后 `node tools/audit-report.mjs --verify` 输出 `chain ok`。
 10. **重启核对**：`~/.dsh/guardrails/loaded.json` 的 `version` 与 `package.json` 一致、mtime 在最近几分钟内（pid 不可信）。
-11. **observe × R3 脱敏**（§2.6-4）：`rules.secrets.mode = "observe"` 下跑一条含假 token 的 shell 命令 → 无卡、无拦截、`event: "observed"`；扫当天审计全目录，断言 payload 里只有 `<redacted:*>`、不含原 token 任何子串，且 `payloadSha256`（对脱敏文本算）与 `payloadBytes` 存在；把脱敏正则临时改坏后重跑，断言 `payloadRef === null`（失败关闭生效）。
+11. **observe × R3 脱敏**（§2.6-4）：`rules.secrets.mode = "observe"` 下跑一条含假 token 的 shell 命令 → 无卡、无拦截、`event: "observed"`；扫当天审计全目录，断言 payload 里只有 `<redacted:*>`、不含原 token 任何子串，且 `payloadSha256`（对脱敏文本算）与 `payloadBytes` 存在；把脱敏正则临时改坏后重跑，断言 `payloadRef === null`（失败关闭生效）。**状态（2026-11-17）**：代码已实现、mount 级三条测试已过（`test/plugin.smoke.mjs`）；**宿主 live 已验**（见 §11-6：无卡、payload 只有 `<redacted:openai>`、sha 与文件一致、token 0 次；复扫失败路径 `ref`/`sha` 均 null）。
 
 ---
 
@@ -582,6 +603,7 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 
 1. `apply_patch` 的真实参数形状——宿主 checkout `C:\Users\<you>\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh\` 在本机不存在（路径无效），读不到定义。**2026-11-16 更新**：自保护侧已用"扫描所有字符串参数里的 `*** File:` 行"绕开这个未知（§7.1 第 2 条）；仍未验证的是宿主到底把补丁放在哪个键、以及 R1home 的 `gap-apply-patch-delete-dsh` 是否要同法修补。
 2. observe 场景返回 `next()` 是否与 allow 完全等价——按 `tools/pre-execute` 契约推断，未 live 验证。**2026-11-17 更新**：mount 级测试已确认 `decision.kind === 'allow'` 且审计只有 `observed` 一条（不是 `allowed`），但宿主真实放行流程仍未 live 走一遍。
+6. **observe × R3 脱敏的宿主 live 验证**（2026-11-17 新增）——**同日已验**：临时把 `~/.dsh/guardrails/policy.json` 的 `rules.secrets.mode` 改成 `observe`，跑 `Write-Output "sk-…"`：无卡、无拦截，审计一条 `event:"observed"`、`rule:"R3"`、`mode:"observe"`、`redacted:["openai"]`、`payloadBytes:32`；落盘 payload 正文是 `Write-Output "<redacted:openai>"`，sha256 与记录一致，全审计目录搜 token 0 次。再给 `patterns` 加一条命中占位符的 `redacted` 后重跑：`payloadRef`/`payloadSha256` 均 `null`、`payloadBytes` 是原文长度、`redacted` 仍列标签（失败关闭生效）。验完已把 `mode` 改回 `ask`、`patterns` 清空，并确认同一条命令重新变成 R3 deny（`payloadSha256:null`、token 0 次）。
 3. ~~自保护在 junction/软链加载下的真实路径~~ —— **2026-11-16 已验**：profile 里 `@vlad/dsh-guardrails` 是指向工作区的 junction，`realpathSync` 解析出 `D:\work\guardrails\dsh-guardrails`，`assertSelfRoot` 通过。
 4. ~~`dsh-guardrails/index.js:334` 的 `roots` 合并后对 `facts.protectedHit` 的实际文案~~ —— **2026-11-16 已验**：`test/self-protect.test.mjs` 断言合并 roots 后 `facts.protectedHit === true` 且卡片含 `受保护目录` / `protected directory`。
 5. ~~`write`/`edit`/`apply_patch` 的审批卡片是否预览参数正文~~ —— **2026-11-16 已验**：`write` 弹卡、卡片不含正文（用户确认），`describe()` 只给 label（§2.6-1）。残余：用户反馈卡片上没见到路径与提示，待确认是否渲染 bug。

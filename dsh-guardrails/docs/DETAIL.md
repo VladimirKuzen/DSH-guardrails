@@ -164,8 +164,11 @@ last good policy to keep, and the host's "keep the previous policy" behaviour wo
 
 - **Audit**: `~/.dsh/guardrails/audit/v2/` — `requested` / `delivered` / `outcome` / `executed` records,
   plus `allowed` for the opt-in workspace quiet (P1.7) and for `mode: "allow"` blocks, plus `observed` for
-  `mode: "observe"` blocks (P3), with a hash chain; full command text lives under `payload/`, secrets keep only
-  the hash. Read it with `node tools/audit-report.mjs --stats --verify`.
+  `mode: "observe"` blocks (P3), with a hash chain; full command text lives under `payload/`. Secrets are
+  never written and never hashed: a hash of a low-entropy secret is a dictionary oracle, so a secret record
+  carries `payloadBytes` only. The one exception is an `observed` secret, where the run is replaced by
+  `<redacted:label>` before anything is written, and a re-scan that still matches drops the payload entirely
+  (`redacted` lists the labels). Read it with `node tools/audit-report.mjs --stats --verify`.
 - **Heartbeat**: `~/.dsh/guardrails/loaded.json`. Fresh mtime plus a matching version is the liveness
   signal; a pid proves nothing.
 - **No new daemon**: it runs inside the DSH host process.

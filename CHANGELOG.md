@@ -58,6 +58,12 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   CLI, so those three cannot drift apart again.
 - `test/engine-v2.test.mjs` was missing from the `npm test` chain; its 17 tests are wired in now, and the CLI
   replays the whole contract table as a second runner.
+- A secret is never hashed: a hash of a low-entropy secret (`password=hunter2`) is a dictionary oracle, so a
+  secret record now carries `payloadBytes` only. Under `observe` the secret run is replaced by
+  `<redacted:label>` before the payload is written, a re-scan that still matches drops the payload entirely,
+  and `redacted` records which shapes were removed (`lib/redact.js`, `test/redact.test.mjs`).
+- `reasonsTruncated` marks a record whose `reasons[]` was cut at 8, so a reader can tell "one band matched"
+  from "ten did".
 
 ## [1.4.0] - 2026-11-15
 

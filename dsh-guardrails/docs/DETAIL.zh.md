@@ -144,7 +144,9 @@
 
 - **审计**：`~/.dsh/guardrails/audit/v2/`——`requested` / `delivered` / `outcome` / `executed` 事件流，
   外加可选的 `allowed`（P1.7 工作区静默放行，以及 `mode: "allow"` 的块）和 `observed`（`mode: "observe"`
-  的块，P3）；带哈希链；命令原文在 `payload/`，密钥只留哈希。
+  的块，P3）；带哈希链；命令原文在 `payload/`。**密钥既不入盘也不留哈希**——低熵密钥的哈希等于一个可离线
+  爆破的校验值，所以密钥记录只有 `payloadBytes`。唯一例外是 `observe` 下的密钥命中：先把命中片段替换成
+  `<redacted:label>` 再落盘，落盘前复扫仍有命中就整条不写（`redacted` 记下标签）。
   用 `node tools/audit-report.mjs --stats --verify` 读取。
 - **心跳**：`~/.dsh/guardrails/loaded.json`。判据是“修改时间新鲜 + 版本一致”，pid 不可信。
 - **不新增常驻进程**：它跑在 DSH 宿主进程里。

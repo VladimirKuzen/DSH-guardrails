@@ -206,3 +206,21 @@ test('every action.entry.* key exists in both locale packs', () => {
     assert.equal(typeof LOCALES.en[`action.entry.${mode}`], 'string', `en action.entry.${mode}`);
   }
 });
+
+test('more than eight matches are cut, and the record says so', () => {
+  const entries = Array.from({ length: 10 }, (_, index) => ({
+    id: `watch-${index}`,
+    tool: ['pwsh'],
+    mode: 'observe',
+    when: { commandMatches: '^\\s*Remove-Item\\b' },
+  }));
+  const verdict = evaluate(policyV2({ entries }), shell('Remove-Item -Recurse D:\\work\\dist'), ENV);
+  assert.equal(verdict.rule, 'R2', 'the built-in ask outranks the observing entries');
+  assert.equal(verdict.reasons.length, 8);
+  assert.equal(verdict.reasonsTruncated, true);
+});
+
+test('eight or fewer matches are not flagged as truncated', () => {
+  const verdict = evaluate(policyV2(), shell('Remove-Item -Recurse D:\\work\\dist'), ENV);
+  assert.equal(verdict.reasonsTruncated, undefined);
+});

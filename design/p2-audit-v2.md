@@ -114,13 +114,15 @@ model 发起工具调用
 | `displayReason` | `{en,zh,...}` | 当时卡片文案的完整 map |
 | `localeAtDecision` | `zh｜en` | 当时界面语言 |
 | `payloadRef` | string \| null | 原文文件相对路径 |
-| `payloadSha256` | string \| null | 原文哈希 |
+| `payloadSha256` | string \| null | 原文哈希；**密钥命中时为 `null`**（低熵密钥的哈希等于可爆破校验值，见 P3 §2.6-2）；`observe` 的密钥命中对脱敏文本算 |
 | `payloadBytes` | number \| null | 原文字节数 |
 | `payloadTruncated` | bool | 是否只存了前缀 |
 | `prevHash` | string | 上一条的 `hash`，当天首条为 `chain.json` 的 `lastHash` 或 `"genesis"` |
 | `hash` | string | 本记录的链哈希 |
 | `entryId` | string \| 省略 | P3：命中的自定义条目 id（`rule: "E"` 时必在） |
 | `reasons` | array \| 省略 | P3：全部命中（最多 8 条），每条 `{ rule, mode, sub?, severity?, entryId? }`；只进审计，不上卡片 |
+| `reasonsTruncated` | `true` \| 省略 | P3：`reasons[]` 被截到 8 条时为真，用来区分"只命中一条"和"命中了十条" |
+| `redacted` | array \| 省略 | P3：`observe` 的密钥 payload 里被替换掉的形状标签（如 `["openai"]`），文件里对应 `<redacted:openai>` |
 | `secretHit` | bool \| 省略 | P3：本次调用是否命中过密钥形状；为真时 payload 走 R3 形状（不落原文），**即使赢家不是 R3** |
 | `policyVersion` | `1｜2` \| 省略 | P3：判定时用的引擎版本 |
 
