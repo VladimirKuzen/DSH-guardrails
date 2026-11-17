@@ -39,9 +39,9 @@ Self-protection (`rules.selfProtect`) accepts only `ask`, `deny` and — under `
 `off` and `allow` are rejected, because a switch that the file it protects could turn off is not a gate. The
 `observe` setting is a development truce: edits to the gate are recorded (`observed`) instead of carded, so a
 change can be made and reviewed afterwards, but it is not a mode to ship with. It covers the plugin directory
-the host actually loaded, so editing `rules.js` or `lib/` through a tool raises a card. It is **not a sandbox**:
-hand edits, other processes, an `fs` write inside the plugin itself, and `apply_patch` calls whose arguments
-carry only patch text all bypass it.
+the host actually loaded, so editing `rules.js` or `lib/` through a tool raises a card — including a path or a
+`Move to` destination inside `apply_patch` text. It is **not a sandbox**: hand edits, other processes and an `fs`
+write inside the plugin process all bypass it.
 
 ## Dry run before an unreadable delete (P1.8)
 

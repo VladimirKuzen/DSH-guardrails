@@ -134,6 +134,24 @@ export function allStrings(args, out = [], depth = 0) {
   return out;
 }
 
+/**
+ * `apply_patch` carries its targets inside the patch text: one header per file,
+ * plus an optional `Move to` line for renames. Both are writes at the
+ * destination, so both have to be read before any path band decides.
+ */
+export function patchTargets(args) {
+  const targets = [];
+  for (const text of allStrings(args)) {
+    for (const pattern of [/^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm, /^\*\*\* Move to: (.+)$/gm]) {
+      for (const match of text.matchAll(pattern)) {
+        const target = match[1].trim();
+        if (target !== '') targets.push(target);
+      }
+    }
+  }
+  return targets;
+}
+
 /** True when the normalized path is the root or sits below one of the roots. */
 export function isUnder(path, roots) {
   return roots.some((root) => root !== '' && (path === root || path.startsWith(`${root}\\`)));

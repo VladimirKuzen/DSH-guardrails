@@ -10,7 +10,7 @@ P4 只做发布工程：**不动引擎语义、不加规则、不引新依赖、
 ## 0. 现状核对（2026-11-17 18:00，只读）
 
 - 版本 **1.5.0**；`v1.5.0` 与 `p3` 两个附注 tag 都指向 1.5.0 收口的那个提交（历史重写后为 `0c5afd9`）。
-- 测试 **18 个文件 404 条**全绿，由 `dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联（本机没有 `npm`，
+- 测试 **18 个文件 404 条**全绿（1.5.1 起为 413 条），由 `dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联（本机没有 `npm`，
   用 bundled node 逐文件跑，见 §3.3）。
 - 包 `@vlad/dsh-guardrails`，`"private": true`，MIT，`engines.dsh: ">=0.2.0-0"`；没有发布到 npm，也没有 CI。
 - 仓库已有 `LICENSE`、`.gitignore`、`.gitattributes`、双语 `README`/`CHANGELOG`、`docs/` 六份、`examples/policy/` 四份。
@@ -89,7 +89,7 @@ git diff --stat 2251613..HEAD -- dsh-guardrails/lib dsh-guardrails/rules.js dsh-
 
 ### 3.5 证据（2026-11-17 17:4x）
 
-- 全套 **18 文件 404 条 / 0 失败**：audit 11、cli 78、contract 73、critical 15、describe 17、docs 4、dry-run 10、
+- 全套 **18 文件 404 条 / 0 失败**（1.5.1 之后为 413：contract 73→77、cli 78→82、self-protect 22→23）：audit 11、cli 78、contract 73、critical 15、describe 17、docs 4、dry-run 10、
   engine-v2 19、examples 4、facts 29、finalize 9、plugin.smoke 38、policy-schema 10、quiet 19、redact 9、replay 3、
   rules 34、self-protect 22。
 - 负对照：把 `i18n/en.json` 的 `action.delete` 改名 → `docs.test.mjs` 报 `pass 3 / fail 1` 并列出缺失 key；改回来恢复 `pass 4`。
@@ -101,24 +101,24 @@ git diff --stat 2251613..HEAD -- dsh-guardrails/lib dsh-guardrails/rules.js dsh-
 
 ### 4.1 为什么必须重写
 
-只改工作树不够：`git grep` 显示 **8 条提交**碰过 `My Documents`、**2 条**碰过 `Administrator`。当时共 54 条提交，
+只改工作树不够：`git grep` 显示 **8 条提交**碰过硬编码的本机路径（文档目录名 + 账户名），其中 **2 条**还带账户名。当时共 54 条提交，
 凡是读过旧历史的克隆都能拿到原路径。所以要么重写，要么接受"公开即泄露目录结构"。
 
 ### 4.2 替换表
 
-`git filter-repo --replace-text` 的 `literal:` 规则，按顺序取第一个匹配，所以"先具体、后通用"：
+`git filter-repo --replace-text` 的 `literal:` 规则，按顺序取第一个匹配，所以"先具体、后通用"。表里共 7 行，这里按语义写，不写旧串原文（原因见 §4.7）：
 
 ```
-literal:D:\work\guardrails==>D:\work\guardrails
-literal:D:\\work\\guardrails==>D:\\work\\guardrails
-literal:D:\work\DSH-guardrails-DOCS==>D:\work\DSH-guardrails-DOCS
-literal:D:\work\==>D:\work\
-literal:D:\\work\\==>D:\\work\\
-literal:C:\Users\<you>==>C:\Users\<you>
-literal:C:\\Users\\\<you>==>C:\\Users\\<you>
+① 旧仓库绝对路径                     ==> D:\work\guardrails
+② 同一路径的双反斜杠形态             ==> D:\\work\\guardrails
+③ 路线图文档仓                       ==> D:\work\DSH-guardrails-DOCS
+④ 旧文档根目录                       ==> D:\work\
+⑤ 旧文档根目录的双反斜杠形态          ==> D:\\work\\
+⑥ C:\Users\<账户名>                  ==> C:\Users\<you>
+⑦ 第 ⑥ 行的双反斜杠形态              ==> C:\\Users\\<you>
 ```
 
-第 2、5、7 行是同一路径在 JS/JSON/PowerShell 字符串里被转义成双反斜杠的形态。提交消息不用改：
+第 ②⑤⑦ 行是同一路径在 JS/JSON/PowerShell 字符串里被转义成双反斜杠的形态。提交消息不用改：
 `git log --all --format=%B` 对两条关键词 0 命中，唯一作者身份是 GitHub noreply 地址。
 
 ### 4.3 执行顺序
@@ -126,7 +126,7 @@ literal:C:\\Users\\\<you>==>C:\\Users\\<you>
 1. 先把阶段 A 的四条提交推到远端；
 2. `git clone --mirror <repo> %TEMP%\guardrails-rewrite-<ts>`，在镜像里跑 `git filter-repo --force --replace-text <表>`；
 3. `filter-repo` 会删掉 `origin`（防止误推），必须重新 `git remote add origin <repo>`；
-4. 在镜像里验证：`git log --all --oneline -S 'My Documents'`、`-S 'Users\Administrator'` 均为空；
+4. 在镜像里验证：对上表每个旧串各跑一次 `git log --all --oneline -S '<旧串>'`，全部为空；
 5. `git push --force --mirror origin`（连 tag 一起）；
 6. 本地 `git fetch --force --tags && git reset --hard origin/main`（tag 也被重写，必须带 `--force --tags`）。
 
@@ -136,9 +136,8 @@ literal:C:\\Users\\\<you>==>C:\\Users\\<you>
 |---|---|
 | `git status -sb` | `## main...origin/main`，无 ahead/behind |
 | `git rev-list --count HEAD` | `59`（重写前的 54 条 + P4 的 5 条；之后随新提交增长） |
-| `git log --all -S 'My Documents'` | 空 |
-| `git log --all -S 'Users\Administrator'` | 空 |
-| `git grep -c 'My Documents'` | 无命中（exit 1） |
+| `git log --all -S '<旧串>'`（逐个） | 全为空 |
+| `git grep '<旧串>'` | 无命中（exit 1） |
 | `git rev-parse "v1.5.0^{commit}" "p3^{commit}"` | 两者都是 `0c5afd9`，tag 关系未拆散 |
 
 阶段 A 四条提交在重写后的哈希：`d2d53b8`（文书）→ `84452fd`（文档测试）→ `d28bfc1`（占位替换）→ `919420d`（CHANGELOG）。
@@ -168,6 +167,12 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 重写后一致（`v1.5.0` = `7ca2ff0`、`p3` = `9748b32`，解引用后同为 `0c5afd9`）。**远端侧未由本机核对**：沙箱里的
 `git fetch`/`git ls-remote` 报 `schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`，凭证只在用户的
 交互会话里可用；远端 refs 数量以用户执行的 `git ls-remote origin` 为准（§10-8）。
+
+### 4.7 残留与发布前动作
+
+`design/p4-release.md` 首次提交（`48c818f`）里，§4.2 的替换表写的是旧串原文——它是在重写**之后**才写进仓库的，
+所以没被那一轮过滤带走。2026-11-18 起 §4.2 改成占位符，但 `48c818f` 之后的提交里仍有旧串。**转公开之前**
+再做一次同样的 `--replace-text` 扫尾（表同 §4.2 的七行，一次就够），或者明确接受"文档目录名与账户名见诸公开历史"。
 
 ## 5. 阶段 B：包元数据（已完成，2026-11-17 22:5x）
 

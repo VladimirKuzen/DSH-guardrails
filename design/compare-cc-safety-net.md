@@ -14,7 +14,7 @@
 | 我方版本 | 1.4.0 | 1.5.0：引擎 v2、`entries[]`、`observe`、两阶段预演、工作区静默、`check`、审计 v2（哈希链 + `--verify`）、自保护 |
 | 规则计数 | "30 条正则" | **23 条**（v1 把注释行与紧缩写法的行也算进去了），见 §3 表 |
 | 第 6 节七条建议 | 全部"待做" | 逐条标注落地情况：P3 收口时**五条没进 1.5.0**，两条半落地 |
-| 新发现 | — | 我们自己的 `apply_patch` 缺口收窄了但没消失：R1 自保护读补丁文本，R1（`~/.dsh`）不读（§4.3 有 2026-11-17 23:41 的实测） |
+| 新发现 | — | 我们自己的 `apply_patch` 缺口：1.5.1 修好（`patchTargets()` 提到 `kit.js`，R1 与自保护共用，含 `*** Move to:`；§4.3 有修前实测与修后判定） |
 
 ---
 
@@ -108,12 +108,12 @@
 
 它的盲区（DSH 页面原文）：PTC 的 `run_code`（模型写的 TS 直接调 Node API，只有它发出的工具调用才进闸）；`terminal_send` 写进常驻 shell 不分析；插件自带的 shell 工具（如 `dsh-ops` 的 `ops_bash`）未在 `rule.json` 里声明前完全不看，只给 agent 提示一次让它自己去声明。
 
-我们这边的 `apply_patch`：P3 记过的缺口是"`pathOf` 拿不到补丁文本里的路径"，现在**只补了一半**——R1 自保护会把 `*** Add/Update/Delete File:` 扫出来（`lib/rules/r1-self.js:64-73`），R1 本体（`lib/rules/r1-home.js:43-52`）仍只读 `pathOf`。实测（2026-11-17 23:41，`tools/check.mjs --args -`）：
+我们这边的 `apply_patch`：P3 的缺口是"`pathOf` 拿不到补丁文本里的路径"，当时只补了自保护（`lib/rules/r1-self.js` 扫 `*** Add/Update/Delete File:`），R1 本体（`lib/rules/r1-home.js`）仍只读 `pathOf`。1.5.1 把扫描提到 `lib/rules/kit.js` 的 `patchTargets()`，两个 band 共用，并补上 `*** Move to:` 的目的地（改名也是写目的地）。修前实测（2026-11-17 23:41，`tools/check.mjs --args -`）：
 
-- 补丁目标是 `D:\work\guardrails\dsh-guardrails\rules.js` → `review  R1 ask self`，exit 2
-- 补丁目标是 `C:\Users\<you>\.dsh\guardrails\policy.json` → `allow  no rule matched`，exit 0
+- 补丁目标是 `D:\work\guardrails\dsh-guardrails\rules.js` → `review  R1 ask self`，exit 2（当时就挡住）
+- 补丁目标是 `C:\Users\<you>\.dsh\guardrails\policy.json` → `allow  no rule matched`，exit 0（1.5.1 起是 `review  R1 ask`，见 `CHANGELOG.md`）
 
-这不是 P4 该修的（P4 冻结引擎），但它是"我们和它比，谁的补丁路径看得住"这一问的准确答案：**自保护看住了，DSH 家目录没看住。**
+所以"谁的补丁路径看得住"这一问，在 1.5.1 之后对我们这边是完整的：补丁按"写哪算哪"判定，写进哪一层就归哪条 band。
 
 ---
 
@@ -161,7 +161,7 @@
 | 6.3 | 坏配置可观测 | **半落地**：校验器拒载 + 审计 `config-invalid`（`index.js:258-268`）；没有运行时的 `degraded` 策略标志，也没有 `configFallback` 审计字段 |
 | 6.4 | 项目策略放宽逐行上报 | 不适用（只有用户域一份策略） |
 | 6.5 | `explain` / trace | **半落地**：`check --json` 有 `winner`/`reasons`/`facts`；没有"命中但被排序压下去"的完整 trace，也没有回放 |
-| 6.6 | 改规则必须先过 fixture | **半落地**：契约表在 `test/fixtures/contract-cases.json`，8 个 `knownGap` 用例被断言"当前放行"；落盘仍无机械闸门，靠记得跑 `npm test` |
+| 6.6 | 改规则必须先过 fixture | **半落地**：契约表在 `test/fixtures/contract-cases.json`，7 个 `knownGap` 用例被断言"当前放行"；落盘仍无机械闸门，靠记得跑 `npm test` |
 | 6.7 | 逐 profile 的 fail-open 表 | **未落地**；`docs/DSH-API.md:22` 只有一行 fail-open 注记 |
 
 ### 6.1 残余风险登记表（仍然最该抄）
@@ -273,11 +273,11 @@ v1 给 P3 提了五条文档层修订（合并 RR 登记表、加 `intent`、加
 | 规则带 `intent` | 没做 | 2.0 候选（引擎 v2 的 `reasons[]` 是现成载体） |
 | 运行时 `degraded` + `configFallback` | 只做了"拒载 + `config-invalid` 审计" | 2.0 候选 |
 | `check --json` 带 trace | 做了 `winner`/`reasons`/`facts`，没有跳过项 | 增量可做 |
-| 验收里 RR 反查 `knownGap` | 没做；8 个 `knownGap` 用例只断言"当前放行" | 2.0 候选 |
+| 验收里 RR 反查 `knownGap` | 没做；7 个 `knownGap` 用例只断言"当前放行" | 2.0 候选 |
 
 P4 的约束是"不动引擎语义"，所以这份文档在 P4 里只当**输入**：它回答"要不要装"（不装）和"下一版值得学什么"（第 6 节，按上表排序）。真正落地要等 2.0 的提案。
 
-这些条目已按 `C-1`…`C-9` 编号收进 [design/v2-candidates.md](v2-candidates.md)，连同 `apply_patch` 那条实测缺口（`C-1`）。
+这些条目已按 `C-1`…`C-9` 编号收进 [design/v2-candidates.md](v2-candidates.md)，连同 `apply_patch` 那条实测缺口（`C-1`，已在 1.5.1 落地，见 `CHANGELOG.md`）。
 
 ---
 

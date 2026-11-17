@@ -13,6 +13,7 @@ import {
   expandPath,
   isUnder,
   mentionsHomeNearWrite,
+  patchTargets,
   pathOf,
   str,
 } from './kit.js';
@@ -48,6 +49,22 @@ export function evaluateR1(call, rule = {}, env, opts = {}) {
         mode,
         reason: `Guardrails R1: tool "${name}" writes inside DSH's protected home (${target}).`,
       };
+    }
+  }
+
+  // `apply_patch` has no path argument: its targets live in the patch text, and a
+  // `Move to` line writes at the destination. Reading them here keeps the home as
+  // protected as a `write` to the same path.
+  if (name === 'apply_patch') {
+    for (const raw of patchTargets(args)) {
+      const target = expandPath(raw, env, env?.CWD);
+      if (isUnder(target, roots)) {
+        return {
+          rule: 'R1',
+          mode,
+          reason: `Guardrails R1: a patch writes inside DSH's protected home (${target}).`,
+        };
+      }
     }
   }
 

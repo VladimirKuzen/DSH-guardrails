@@ -22,10 +22,10 @@ import { fileURLToPath } from 'node:url';
 import {
   PATH_TOOLS,
   SHELL_TOOLS,
-  allStrings,
   expandPath,
   isUnder,
   mentionsPathNearWrite,
+  patchTargets,
   pathOf,
   str,
 } from './kit.js';
@@ -59,17 +59,6 @@ export function selfRoots(rule = {}, env = {}) {
     .map((root) => expandPath(root, env))
     .filter((root) => root !== '');
   return [...new Set(roots)];
-}
-
-/** `apply_patch` carries its targets inside the patch text, not in a path argument. */
-const PATCH_TARGET = /^\*\*\* (?:Add|Update|Delete) File: (.+)$/gm;
-
-function patchTargets(args) {
-  const targets = [];
-  for (const text of allStrings(args)) {
-    for (const match of text.matchAll(PATCH_TARGET)) targets.push(match[1].trim());
-  }
-  return targets;
 }
 
 /**

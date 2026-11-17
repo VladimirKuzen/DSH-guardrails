@@ -10,7 +10,7 @@
 - **可审计**：每次被拦截的调用写一行 JSONL；密钥永远不以明文落盘。
 - **仅 Windows**，1.x。路径语义按 Windows 处理（`~`、`%VAR%`、`$env:VAR`、反斜杠）。
 
-**状态**：v1.5.0。P1.6 系统级硬停与审计 v2 已在 Windows 11 上完成 live 验收（2026-11-15）：deny 不弹卡、
+**状态**：v1.5.1。P1.6 系统级硬停与审计 v2 已在 Windows 11 上完成 live 验收（2026-11-15）：deny 不弹卡、
 命令不执行；批准后的调用产生完整的 `requested → delivered → outcome → executed` 链并带 payload；
 `--verify` 能校验哈希链。此后又加入了排序引擎（`version: 2`）、自定义 `entries`、`observe`、
 两阶段预演、工作区静默与 `check` 命令行，并逐项做过 live 验收；每一步的原因与验证方式记在
@@ -38,8 +38,8 @@ Agent 最危险的时刻，是"一句话"变成"一个动作"的那一秒：它�
 
 | 规则 | 触发条件 | 默认动作 |
 |---|---|---|
-| **R1** 保护 DSH 自身目录 | 写动词的实参落在 `~/.dsh` 或 `~/.agents` 下；任何 `plugin_manager` 操作 | 弹审批 |
-| **R1 self** 保护插件自身 | 写入目标是本插件的源码目录——包括 `apply_patch` 正文里出现的路径 | 弹审批 |
+| **R1** 保护 DSH 自身目录 | 写动词的实参落在 `~/.dsh` 或 `~/.agents` 下，含 `apply_patch` 文本里点名的目标；任何 `plugin_manager` 操作 | 弹审批 |
+| **R1 self** 保护插件自身 | 写入目标是本插件的源码目录——包括 `apply_patch` 正文里出现的路径与 `*** Move to:` 目的地 | 弹审批 |
 | **R2** 破坏性操作 | 命令位置上的删除/移动/改名，`robocopy /MIR`、`git reset --hard`、`git clean -f`、`format`、`diskpart`、`reg add/delete/import`、`sc create/config/delete`、`schtasks`、`netsh advfirewall`、`Set-MpPreference`、`takeown`、`icacls`、`chkdsk /f`、`dism /remove-*`、`sfc /scannow` | 弹审批 |
 | **R2 critical**（严重级） | 格式化/分区磁盘、`diskpart /s`、启动配置写入（`bcdedit`、`bootrec`、`vssadmin delete`、`wbadmin delete`、`reagentc`）、删除 `HKLM\SYSTEM` 或 `HKLM\SAM`、写/删/移动 `%SystemRoot%` 或 `%ProgramFiles%` 下的内容、`takeown`/`icacls` 指向这些目录 | 直接拒绝 |
 | **R3** 工具参数里的密钥 | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / Bearer / 私钥块 / `key=...` 赋值 | shell 命令直接拒绝；文件写入弹审批（只记类型） |

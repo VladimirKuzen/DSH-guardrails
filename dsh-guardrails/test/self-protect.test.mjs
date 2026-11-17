@@ -173,6 +173,18 @@ test('self: apply_patch with only patch text is scanned, not skipped', () => {
   assert.match(verdict.reason, /patch/);
 });
 
+test('self: a patch that only moves a file into the source is scanned too', () => {
+  const patch = [
+    '*** Begin Patch',
+    '*** Update File: D:\\work\\notes.md',
+    `*** Move to: ${root}\\rules.js`,
+    '*** End Patch',
+  ].join('\n');
+  const verdict = evaluate(policy({ mode: 'ask', paths: [] }), call('apply_patch', { patch }), env);
+  assert.equal(verdict?.rule, 'R1');
+  assert.equal(verdict?.sub, 'self');
+});
+
 test('self: a patch outside the protected roots is untouched', () => {
   const patch = ['*** Begin Patch', '*** Update File: D:\\work\\notes.md', '@@', '-a', '+b', '*** End Patch'].join('\n');
   assert.equal(evaluate(policy({ mode: 'ask', paths: [] }), call('apply_patch', { patch }), env), null);

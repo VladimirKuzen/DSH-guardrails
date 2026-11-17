@@ -463,7 +463,7 @@ Get-Content args.json -Raw | & $node dsh-guardrails/tools/check.mjs --tool pwsh 
 实现中确定的三条（设计文档未写死，按"更安全的一侧"落地）：
 
 1. **`version: 2` 暂时被拒**，报 `unsupported-version`（"engine v2 is not implemented yet"）。理由：现在放行 v2 会让 `allow` 与 `entries` 被静默忽略，正是 §2.8-3 要防的静默变宽。第 ③ 步把 `SUPPORTED_VERSION` 改成 2 并补 v2 行为。
-2. **`apply_patch` 不再留空**：`r1-self.js` 扫描所有字符串参数里的 `*** (Add|Update|Delete) File: <path>`，命中受保护根即弹卡。参数形状仍未知，但"只有 patch 文本"这条路径已封。R1home 的同类漏口（`gap-apply-patch-delete-dsh`）**未**修，仍登记为 `knownGap`。
+2. **`apply_patch` 不再留空**：`r1-self.js` 扫描所有字符串参数里的 `*** (Add|Update|Delete) File: <path>`，命中受保护根即弹卡。参数形状仍未知，但"只有 patch 文本"这条路径已封。R1home 的同类漏口（`gap-apply-patch-delete-dsh`）当时未修、登记为 `knownGap`；**1.5.1 已修**（`patchTargets()` 提到 `kit.js`，两个 band 共用，并补 `*** Move to:`）。
 3. **`selfProtect.mode` 的双重门禁**：schema 的 `enum` 拒绝 `off`/`allow`，`evaluateR1Self` 里也再判一次 `mode !== 'ask' && mode !== 'deny' → null`。绕过校验的手写策略同样关不掉。
 
 **重启后首测暴露的三个问题（2026-11-16，已修前两个）**

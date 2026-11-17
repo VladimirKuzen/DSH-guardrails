@@ -11,7 +11,7 @@ and leaves a local audit trail of what was gated.
 - **Auditable**: every gated call writes one JSONL line; secrets are never written in clear text.
 - **Windows-only**, 1.x. Path semantics assume Windows (`~`, `%VAR%`, `$env:VAR`, backslashes).
 
-**Status**: v1.5.0. The critical tier and the audit v2 stream were verified live on Windows 11
+**Status**: v1.5.1. The critical tier and the audit v2 stream were verified live on Windows 11
 (2026-11-15): denied calls return no card and never execute, an approved call produces the full
 `requested → delivered → outcome → executed` chain with a payload, and `--verify` validates the hash chain.
 Since then the ranked engine (`version: 2`), custom `entries`, `observe`, the two-stage dry run, workspace
@@ -41,8 +41,8 @@ do not stop any of that. This gate sits on the last hop before execution and ask
 
 | Rule | Fires when | Default |
 |---|---|---|
-| **R1** Protect DSH's own home | A write verb whose operand is inside `~/.dsh` or `~/.agents`; any `plugin_manager` operation | ask |
-| **R1 self** Guard the plugin | A write whose operand is this plugin's own source directory — including a path found inside an `apply_patch` body | ask |
+| **R1** Protect DSH's own home | A write verb whose operand is inside `~/.dsh` or `~/.agents`, including a target named in `apply_patch` text; any `plugin_manager` operation | ask |
+| **R1 self** Guard the plugin | A write whose operand is this plugin's own source directory — including a path or a `Move to` destination inside an `apply_patch` body | ask |
 | **R2** Destructive operations | Delete/move/rename in command position, `robocopy /MIR`, `git reset --hard`, `git clean -f`, `format`, `diskpart`, `reg add/delete/import`, `sc create/config/delete`, `schtasks`, `netsh advfirewall`, `Set-MpPreference`, `takeown`, `icacls`, `chkdsk /f`, `dism /remove-*`, `sfc /scannow` | ask |
 | **R2 critical** (severity) | Formatting/partitioning a disk, `diskpart /s`, boot configuration writers (`bcdedit`, `bootrec`, `vssadmin delete`, `wbadmin delete`, `reagentc`), deleting `HKLM\SYSTEM` or `HKLM\SAM`, writing/deleting/moving anything inside `%SystemRoot%` or `%ProgramFiles%`, `takeown`/`icacls` aimed at those directories | deny |
 | **R3** Secrets in tool arguments | Ark / `sk-` / `AKIA` / `ghp_` / `AIza` / `xox` / bearer tokens / private key blocks / `key=...` assignments | deny in shell commands, ask on file writes (label only) |

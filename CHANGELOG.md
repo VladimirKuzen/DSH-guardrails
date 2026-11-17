@@ -18,7 +18,7 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   `test/self-protect.test.mjs` derives the workspace from the checkout (the parent of `pluginRoot()`)
   instead of hard-coding it, so the case no longer depends on where the repository lives.
 - `README.md` / `README.zh-CN.md` no longer call the plugin "pre-1.0", and the test-file count in the
-  development section now matches reality: 18 files, 404 cases.
+  development section now matches reality: 18 files, 413 cases.
 - `design/p4-release.md` records the four decisions, the stages, the history rewrite and the evidence behind
   each claim.
 - Package metadata: `repository` (with `directory: "dsh-guardrails"`, since the package sits in a
@@ -36,6 +36,17 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 - The install section is followable on a clean machine: it starts with `git clone`, and the `pnpm install` step
   calls the pnpm that DSH ships (`~/.dsh/dsh-runtimes/*/dependencies/pnpm`), because neither `pnpm` nor `node` is
   on `PATH` after a plain Windows install.
+
+## [1.5.1] — 2026-11-18
+
+- R1 reads the targets carried inside `apply_patch` text — the `*** Add|Update|Delete File:` header and the
+  `*** Move to:` destination — and checks them against `~/.dsh` and `~/.agents` exactly like a `write` to that
+  path. A patch that rewrote `~/.dsh/guardrails/policy.json` used to return `allow`; it now asks. This is a
+  deliberate tightening: a v1 policy can gain a card, never a silent allow.
+- Self-protection reads `*** Move to:` too. Until now only the file headers were scanned, so a patch that just
+  renamed a file into the plugin source was not seen.
+- Seven `knownGap` entries remain in the contract table (`gap-apply-patch-delete-dsh` became an ordinary case);
+  413 assertions across 18 files.
 
 ## [1.5.0] — 2026-11-17
 

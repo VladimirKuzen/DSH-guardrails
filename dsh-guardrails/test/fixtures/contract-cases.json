@@ -44,6 +44,33 @@
     "args": { "file_path": "D:\\work\\notes.md", "content": "hi" },
     "expect": { "decision": "allow", "exitCode": 0 }
   },
+  {
+    "id": "R1-patch-update-home",
+    "tool": "apply_patch",
+    "args": { "patch": "*** Begin Patch\n*** Update File: C:\\Users\\Tester\\.dsh\\guardrails\\policy.json\n@@\n-a\n+b\n*** End Patch" },
+    "expect": { "decision": "review", "rule": "R1", "exitCode": 2 },
+    "note": "R1 patch shape: the target lives in the patch text, not in a path argument"
+  },
+  {
+    "id": "R1-patch-move-home",
+    "tool": "apply_patch",
+    "args": { "patch": "*** Begin Patch\n*** Update File: D:\\work\\notes.md\n*** Move to: C:\\Users\\Tester\\.dsh\\guardrails\\evil.json\n*** End Patch" },
+    "expect": { "decision": "review", "rule": "R1", "exitCode": 2 },
+    "note": "a move writes at the destination too"
+  },
+  {
+    "id": "R1-patch-delete-agents",
+    "tool": "apply_patch",
+    "args": { "patch": "*** Begin Patch\n*** Delete File: C:\\Users\\Tester\\.agents\\skills\\review.md\n*** End Patch" },
+    "expect": { "decision": "review", "rule": "R1", "exitCode": 2 }
+  },
+  {
+    "id": "R1-patch-unrelated-allowed",
+    "tool": "apply_patch",
+    "args": { "patch": "*** Begin Patch\n*** Update File: D:\\work\\notes.md\n@@\n-a\n+b\n*** End Patch" },
+    "expect": { "decision": "allow", "exitCode": 0 },
+    "note": "a patch that stays outside the home is still untouched"
+  },
 
   {
     "id": "R2c-format-drive",
@@ -592,11 +619,11 @@
     "note": "mshta is not a known launcher; the payload sits inside a quoted string"
   },
   {
-    "id": "gap-apply-patch-delete-dsh",
+    "id": "R1-patch-delete-dsh",
     "tool": "apply_patch",
     "args": { "patch": "*** Begin Patch\n*** Delete File: C:\\Users\\Tester\\.dsh\\AGENTS.md\n*** End Patch" },
-    "expect": { "decision": "allow", "exitCode": 0, "knownGap": true },
-    "note": "apply_patch carries no path argument, so pathOf() is empty (see design/p3-policy-v2.md 0.2)"
+    "expect": { "decision": "review", "rule": "R1", "exitCode": 2 },
+    "note": "was a knownGap until 1.5.1: apply_patch carries no path argument, so the patch text is scanned instead"
   },
   {
     "id": "gap-short-name-parent",

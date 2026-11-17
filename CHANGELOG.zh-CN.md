@@ -30,6 +30,14 @@
 - 安装一节现在能在干净机器上照做：以 `git clone` 开头，`pnpm install` 一步改为调用 DSH 自带的 pnpm
   （`~/.dsh/dsh-runtimes/*/dependencies/pnpm`）——裸装 Windows 上 `pnpm` 与 `node` 都不在 `PATH` 里。
 
+## [1.5.1] — 2026-11-18
+
+- R1 现在会读 `apply_patch` 文本里的目标——`*** Add|Update|Delete File:` 头与 `*** Move to:` 目的地——并像
+  `write` 同一路径那样对 `~/.dsh`、`~/.agents` 求值。过去改写 `~/.dsh/guardrails/policy.json` 的补丁返回
+  `allow`，现在会弹卡。这是有意的收紧：v1 策略只会多一次弹卡，不会多出一条静默放行。
+- 自保护也读 `*** Move to:`。此前只扫文件头，所以"只是把文件改名移进插件源码"的补丁看不到。
+- 契约表剩七个 `knownGap`（`gap-apply-patch-delete-dsh` 改为普通用例）；18 个文件共 413 条断言。
+
 ## [1.5.0] — 2026-11-17
 
 - 补上一套文档：[docs/POLICY.zh.md](dsh-guardrails/docs/POLICY.zh.md) 讲档位、`entries`、三步放宽法与模板；
