@@ -5,6 +5,8 @@
 的对应小节。路线图原文在仓库外的
 `D:\work\DSH-guardrails-DOCS\implementation-plan.md`（§6 是 P3 的原始条目）。
 
+**P4 的开工单在 `design/p4-handoff.md`**（2026-11-17 起）。
+
 ## 0. 现状快照（2026-11-17，P3 收口后）
 
 - 插件版本 **1.5.0**；`main = 82cdcd7`（`v1.5.0` 与 `p3` 都指向它）；工作树干净。
