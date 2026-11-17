@@ -135,7 +135,7 @@ literal:C:\\Users\\\<you>==>C:\\Users\\<you>
 | 检查 | 结果 |
 |---|---|
 | `git status -sb` | `## main...origin/main`，无 ahead/behind |
-| `git rev-list --count HEAD` | `58`（重写前 54 + 阶段 A 的 4 条） |
+| `git rev-list --count HEAD` | `59`（重写前的 54 条 + P4 的 5 条；之后随新提交增长） |
 | `git log --all -S 'My Documents'` | 空 |
 | `git log --all -S 'Users\Administrator'` | 空 |
 | `git grep -c 'My Documents'` | 无命中（exit 1） |
@@ -150,6 +150,24 @@ literal:C:\\Users\\\<you>==>C:\\Users\\<you>
 - 附注 tag 的对象哈希也变了（`v1.5.0` 的 tag 对象与 `p3` 的不同，但解引用到同一提交）。
 - GitHub 可能仍按旧 SHA 提供缓存对象。私有期无影响；**转公开前**若要彻底清掉，需要 GitHub 支持做一次 purge，
   或干脆删库重建（P4 收尾时二选一，见 §9）。
+
+### 4.6 远端删除重建（2026-11-17 22:45，用户执行）
+
+force-push 只保证"新历史里没有路径"，不保证旧对象不可达；GitHub 的 purge 是人工工单，且官方只协助"无法靠轮换凭据缓解
+的敏感数据"，目录名很可能被判为非敏感数据而拒绝。因此改走确定性更高的一条路：
+
+1. 本地先确认无未推提交，并 `git bundle create <备份>.bundle --all` 留一份离线副本；
+2. GitHub 仓库 Settings → Danger Zone 删除 `VladimirKuzen/DSH-guardrails`（不可逆，需手输仓库名）；
+3. 立刻重建同名仓库：同 owner、same name、**Private**、不初始化 README/.gitignore/LICENSE；
+4. 从本地灌入：`git push -u origin main` + `git push origin --tags`（**不用** `git push --mirror`，它会把
+   `refs/remotes/origin/*` 也推成远端分支），期望远端共 11 个 ref：1 个 `refs/heads/main` + 10 个 tag；
+5. 验证：`git ls-remote origin` 11 行、`main` 指向 `48c818f`；浏览器打开旧提交页 `.../commit/82cdcd7` 应为 **404**
+   （新仓库没有旧对象，不需要工单）。
+
+本地侧已核对（2026-11-17 22:48）：`main` = `origin/main` = `48c818f`、提交 59 条、tag 10 个，且 tag 对象哈希与
+重写后一致（`v1.5.0` = `7ca2ff0`、`p3` = `9748b32`，解引用后同为 `0c5afd9`）。**远端侧未由本机核对**：沙箱里的
+`git fetch`/`git ls-remote` 报 `schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`，凭证只在用户的
+交互会话里可用；远端 refs 数量以用户执行的 `git ls-remote origin` 为准（§10-8）。
 
 ## 5. 阶段 B：包元数据（待办，等确认后开工）
 
@@ -199,6 +217,8 @@ literal:C:\\Users\\\<you>==>C:\\Users\\<you>
 5. 仓库可见性切换：未执行（P4 的最后一个动作）。
 6. GitHub Release 页面与 tag 归档：未创建。
 7. "外人一小时装好"：需要一条干净 profile，公开后补做。
+8. 重建后的远端内容：本机沙箱拿不到 GitHub 凭证（`SEC_E_NO_CREDENTIALS`），只能由用户跑 `git ls-remote origin`
+   （期望 11 个 ref）与打开旧提交 URL（期望 404）来确认。
 
 ## 11. 与既有文档的同步点
 
