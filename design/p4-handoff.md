@@ -7,7 +7,7 @@
 ## 0. 现状快照（2026-11-17，P3 收口后）
 
 - 插件版本 **1.5.0**；`main = 82cdcd7`（`v1.5.0` 与 `p3` 都指向它，其后只有一条文档提交 `b726bed`）。
-- 测试：17 个文件 **400 条**全过（`dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联）。
+- 测试：18 个文件 **404 条**全过（`dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联）。
 - 文档已就位：`README`/`README.zh-CN`、`CHANGELOG` 双语、`docs/{ARCHITECTURE,DSH-API,POLICY,POLICY.zh,DETAIL,DETAIL.zh}.md`、`examples/policy/` 四份模板（有测试保证可用）。
 - 仓库根已有：`LICENSE`（MIT，`Copyright (c) 2026 Vlad`）、`.gitignore`、`.gitattributes`。
 - 包仍是 `"name": "@vlad/dsh-guardrails"` + `"private": true`，没有发布过，没有 CI。
@@ -30,6 +30,8 @@
 3. **`design/` 是否公开**：里面是真实决策与踩坑记录（含本机路径），公开会让"为什么这么判"可查，但也暴露你机器的目录名。建议公开（改成通用路径），因为它是这个项目最有价值的部分之一。
 4. **`scripts/` 是否公开**：现在是个人运维脚本（`health-check.cmd`、`redact.bat` 等），依赖本机布局，已在 `.gitignore` 里。建议不公开。
 
+**拍板结果（2026-11-17）**：(1) 保持现状，`Copyright (c) 2026 Vlad`。(2) 保留 `@vlad/dsh-guardrails`——无 scope 的 `dsh-guardrails` 已被占用；仓库先维持私有，随 P4 逐项验证再转公开，私有→公开的过程本身就是 P4 的设计内容。(3) `design/` 公开，路径改成通用占位。(4) `scripts/` 不公开。
+
 ## 3. 工作分解
 
 ### 3.1 仓库整理
@@ -38,17 +40,17 @@
 - [x] `README.md` / `README.zh-CN.md`（定位、安装、规则表、配置示例、审计、限制、文档地图）
 - [x] `CHANGELOG.md` / `CHANGELOG.zh-CN.md`（1.5.0 定版；更早的条目已按版本分节）
 - [x] `.gitignore`（`_backup/`、`_scratch/`、`scripts/`、`/audit/`、`node_modules/`、`*.log`）
-- [ ] `SECURITY.md`：漏洞怎么报（建议 GitHub 私密报告）、支持哪些版本（`1.x`）、"不要用公开 issue 贴绕过细节"
-- [ ] `CONTRIBUTING.md`：加一条规则要改哪几个文件、必须补哪张测试表、代码注释用英文（弱约束）、测试怎么跑（17 个 `node test/*.mjs`，本机没有 `npm` 时用 bundled node）
-- [ ] `docs/` 内链自检：README 的文档地图指向的每份文件都真实存在（`README` 里那张表是唯一入口）
+- [x] `SECURITY.md`：漏洞怎么报（GitHub 私密报告，私有期走同一入口或仓库持有者账户）、支持哪些版本（`1.x`）、"不要用公开 issue 贴绕过细节"
+- [x] `CONTRIBUTING.md`：加一条规则要改哪几个文件、必须补哪张测试表、代码注释用英文（弱约束）、测试怎么跑（18 个 `node test/*.mjs`，本机没有 `npm` 时用 bundled node）
+- [x] `docs/` 内链自检：`test/docs.test.mjs` 遍历所有被跟踪的 `.md`，逐条解析相对链接，断了就红；同时锁 `i18n` 两份 key 与 `{}` 占位符集合
 
 ### 3.2 去个人化
 
-- [x] 已跟踪文件里没有本机绝对路径（`git grep` 只命中 `design/` 三份文档，且它们不进包）
+- [x] 已跟踪文件里没有本机绝对路径（P4 复核后，README/design/test 里的真实仓库路径、bundled node 路径、宿主安装路径都已换成占位；`git grep` 可复验）
 - [x] `scripts/` 已忽略，`package.json` 的 `files` 白名单不含它
-- [ ] README 里若出现 `~/.dsh/profiles/desktop/...` 之类的具体 profile，改成 `~/.dsh/profiles/<your-profile>/...`
-- [ ] `examples/policy/` 四份模板确认不含真实用户名与真实盘符（现在是 `~/.dsh`、`D:\work`、`~/src/app` 这类占位）
-- [ ] `dsh-guardrails/index.js` 的启动日志里若打印绝对路径，确认只在日志里、不进卡片
+- [x] README 里若出现 `~/.dsh/profiles/desktop/...` 之类的具体 profile，改成 `~/.dsh/profiles/<your-profile>/...`（复核：两版 README 只有 `<profile>` 占位）
+- [x] `examples/policy/` 四份模板确认不含真实用户名与真实盘符（`git grep 'C:\\'` 无命中）
+- [x] `dsh-guardrails/index.js` 的启动日志里若打印绝对路径，确认只在日志里、不进卡片（复核：`index.js` 不打印日志）
 
 ### 3.3 包元数据
 
@@ -60,8 +62,8 @@
 
 ### 3.4 CI
 
-- [ ] GitHub Actions：`windows-latest` + 与宿主一致的 Node 主版本，跑 `npm test`（17 个文件串联）
-- [ ] i18n parity：`i18n/zh.json` 与 `i18n/en.json` 的 key 集合必须相等（现在靠人看，值得一个 20 行的测试）
+- [ ] GitHub Actions：`windows-latest` + 与宿主一致的 Node 主版本，跑 `npm test`（18 个文件串联）
+- [x] i18n parity：`i18n/zh.json` 与 `i18n/en.json` 的 key 集合必须相等（现在由 `test/docs.test.mjs` 保证，含占位符集合）
 - [ ] `check` CLI 冒烟：`node tools/check.mjs --tool pwsh --args '{"command":"git reset --hard"}'` 期望 exit 2；这条也能当文档里的可复制示例
 - [ ] 不做 macOS/Linux job（见非目标）
 

@@ -117,7 +117,7 @@ The order is fixed: R3 → R1 home → R1 self → R2 critical → R2 destructiv
 
 ## Verifying a change
 
-- `npm test` runs every test file in order (16 of them; `node <file>`, not
+- `npm test` runs every file under `test/` in order (`node <file>`, not
   `node --test`, because the sandbox forbids the child processes that runner
   spawns).
 - `node tools/check.mjs --tool pwsh --args '{"command":"..."}' --json` answers
