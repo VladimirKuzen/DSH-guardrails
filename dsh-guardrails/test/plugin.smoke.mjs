@@ -267,10 +267,8 @@ test('workspace quiet allows a temp delete and logs an allowed event', async () 
     enabled: true,
     auditDir: join(dir, 'audit'),
     rules: {
-      destructive: {
-        mode: 'ask',
-        workspaceQuiet: { enabled: true, roots: [work], paths: ['_scratch'], alwaysAsk: ['.git'] },
-      },
+      destructive: { mode: 'ask' },
+      quiet: { enabled: true, roots: [work], paths: ['_scratch'], alwaysAsk: ['.git'] },
     },
   });
   const ctx = fakeCtx();
@@ -287,6 +285,8 @@ test('workspace quiet allows a temp delete and logs an allowed event', async () 
 
 test('workspace quiet still asks for a recursive delete', async () => {
   const work = join(dir, 'work');
+  // Deliberately the pre-P3 location: a config written before rules.quiet existed
+  // must keep behaving the same after the move.
   writePolicy({
     enabled: true,
     auditDir: join(dir, 'audit'),
@@ -301,6 +301,37 @@ test('workspace quiet still asks for a recursive delete', async () => {
 
   const decision = await ctx.pre(call('pwsh', { command: `Remove-Item '${join(work, '_scratch')}' -Recurse -Force` }, 'q2'), next);
   assert.equal(decision.kind, 'ask');
+});
+
+test('an observe entry does not turn workspace quiet back into a card', async () => {
+  const work = join(dir, 'work');
+  const scratch = join(work, '_scratch');
+  mkdirSync(scratch, { recursive: true });
+  const victim = join(scratch, 'watched.txt');
+  writeFileSync(victim, 'x', 'utf8');
+  writePolicy({
+    version: 2,
+    enabled: true,
+    auditDir: join(dir, 'audit'),
+    rules: {
+      destructive: { mode: 'ask' },
+      quiet: { enabled: true, roots: [work], paths: ['_scratch'], alwaysAsk: ['.git'] },
+    },
+    entries: [
+      { id: 'watch-scratch', tool: ['pwsh'], mode: 'observe', when: { commandMatches: '^Remove-Item' } },
+    ],
+  });
+  const ctx = fakeCtx();
+
+  const decision = await ctx.pre(call('pwsh', { command: `Remove-Item '${victim}' -Force` }, 'q3'), next);
+  assert.deepEqual(decision, { kind: 'allow' });
+
+  // The watcher still shows up in the record: quiet fills the space, it does not
+  // erase what else matched.
+  const record = auditLines().find((r) => r.callId === 'q3');
+  assert.equal(record.event, 'allowed');
+  assert.equal(record.quiet, 'workspace');
+  assert.ok(record.reasons.some((reason) => reason.entryId === 'watch-scratch'), JSON.stringify(record.reasons));
 });
 
 test('audit.format "v1" keeps the old single-file format', async () => {

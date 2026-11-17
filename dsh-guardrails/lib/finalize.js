@@ -7,6 +7,7 @@
  * and a change in one of them was invisible to the others.
  */
 
+import { RANK } from '../rules.js';
 import { decideQuiet } from './rules/quiet.js';
 import { selfRoots } from './rules/r1-self.js';
 
@@ -23,20 +24,25 @@ export function factRoots(policy, env) {
  * Decide whether `verdict` should be downgraded to a quiet allow.
  *
  * Only an ordinary R2 ask qualifies. Under engine v2 the winner can be R2 while
- * a stricter band also matched (it would have won instead), so every reason must
- * be an ordinary R2 and the call must not contain a secret anywhere.
+ * another band also matched, so every reason that is at least as strict as ask
+ * must be an ordinary R2 and the call must not contain a secret anywhere.
  *
- * @returns {{verdict: object, decision: null | {quiet: boolean, reason: string}}}
- *   `decision` is the raw `decideQuiet()` result, so callers can report a
- *   misconfiguration (`config-invalid`, `cwd-mismatch`) instead of guessing.
+ * Weaker matches do not veto quiet: an `observe` entry that happens to cover the
+ * same call is a request to watch it, not a request to card it. Letting observe
+ * veto quiet made the two features cancel each other — turning on a watcher
+ * silently turned off workspace quiet for everything it matched.
  */
 export function applyWorkspaceQuiet({ policy, call, verdict, facts, cwd }) {
   if (verdict === null || verdict === undefined) return { verdict, decision: null };
 
-  const onlyOrdinaryR2 = verdict.reasons === undefined
-    || verdict.reasons.every((reason) => reason.rule === 'R2' && reason.severity === undefined);
+  const blocksQuiet = (reason) => {
+    const rank = RANK[reason?.mode] ?? 0;
+    if (rank > RANK.ask) return true; // deny/block
+    if (rank < RANK.ask) return false; // observe/allow: a watcher, not a veto
+    return reason.rule !== 'R2' || reason.severity !== undefined;
+  };
   if (verdict.mode !== 'ask' || verdict.rule !== 'R2' || verdict.severity !== undefined
-    || !onlyOrdinaryR2 || verdict.secretHit === true) {
+    || (verdict.reasons ?? []).some(blocksQuiet) || verdict.secretHit === true) {
     return { verdict, decision: null };
   }
 
@@ -44,7 +50,7 @@ export function applyWorkspaceQuiet({ policy, call, verdict, facts, cwd }) {
     tool: call?.name,
     command: call?.arguments?.command,
     facts,
-    config: policy?.rules?.destructive?.workspaceQuiet,
+    config: policy?.rules?.quiet,
     cwd,
   });
   if (!decision.quiet) return { verdict, decision };

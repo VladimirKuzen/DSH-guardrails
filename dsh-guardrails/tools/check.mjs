@@ -26,7 +26,7 @@ import { evaluate } from '../rules.js';
 import { collectFacts } from '../lib/facts.js';
 import { applyWorkspaceQuiet, factRoots } from '../lib/finalize.js';
 import { describeErrors, validatePolicy } from '../lib/policy/validate.js';
-import { merge } from '../lib/policy/merge.js';
+import { applyAliases, merge } from '../lib/policy/merge.js';
 import { DEFAULTS } from '../index.js';
 
 const EXIT = Object.freeze({ allow: 0, review: 2, block: 3, error: 1 });
@@ -105,7 +105,7 @@ function loadPolicyForCheck({ policy, warn }) {
   } catch (error) {
     if (error?.code === 'ENOENT') {
       warn(`no policy file at ${path}; using built-in defaults`);
-      return { policy: merge(DEFAULTS, {}), path: null };
+      return { policy: applyAliases(merge(DEFAULTS, {})), path: null };
     }
     throw new Error(`${path}: ${error?.message ?? error}`);
   }
@@ -113,7 +113,7 @@ function loadPolicyForCheck({ policy, warn }) {
   if (!report.ok) {
     throw new Error(`${path}: ${describeErrors(report.errors)}`);
   }
-  return { policy: merge(DEFAULTS, file), path };
+  return { policy: applyAliases(merge(DEFAULTS, file)), path };
 }
 
 /**

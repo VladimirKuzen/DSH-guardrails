@@ -322,21 +322,19 @@
       "enabled": true,
       "rules": {
         "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
-        "destructive": {
-          "mode": "ask",
-          "workspaceQuiet": {
-            "enabled": true,
-            "roots": ["D:\\work\\proj"],
-            "paths": ["_scratch", "build"],
-            "alwaysAsk": [".git"]
-          }
+        "destructive": { "mode": "ask" },
+        "quiet": {
+          "enabled": true,
+          "roots": ["D:\\work\\proj"],
+          "paths": ["_scratch", "build"],
+          "alwaysAsk": [".git"]
         },
         "secrets": { "mode": "ask" }
       }
     },
     "io": { "type": "file" },
     "expect": { "decision": "allow", "quiet": "workspace", "exitCode": 0 },
-    "note": "single temp file delete inside the quiet dir; io stubs the stat so the file counts as one existing entry"
+    "note": "single temp file delete inside the quiet dir; quiet now lives at rules.quiet, and io stubs the stat so the file counts as one existing entry"
   },
   {
     "id": "quiet-disabled-default",
@@ -478,6 +476,84 @@
       }
     },
     "expect": { "decision": "review", "rule": "R2", "exitCode": 2 }
+  },
+
+  {
+    "id": "quiet-legacy-alias",
+    "tool": "pwsh",
+    "args": { "command": "Remove-Item 'D:\\work\\proj\\_scratch\\b.txt' -Force" },
+    "cwd": "D:\\work\\proj",
+    "policy": {
+      "enabled": true,
+      "rules": {
+        "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
+        "destructive": {
+          "mode": "ask",
+          "workspaceQuiet": {
+            "enabled": true,
+            "roots": ["D:\\work\\proj"],
+            "paths": ["_scratch"]
+          }
+        },
+        "secrets": { "mode": "ask" }
+      }
+    },
+    "io": { "type": "file" },
+    "expect": { "decision": "allow", "quiet": "workspace", "exitCode": 0 },
+    "note": "the pre-P3 location still works: rules.destructive.workspaceQuiet is moved to rules.quiet before any rule reads it"
+  },
+  {
+    "id": "v2-quiet-survives-observe-entry",
+    "tool": "pwsh",
+    "args": { "command": "Remove-Item 'D:\\work\\proj\\_scratch\\c.txt' -Force" },
+    "cwd": "D:\\work\\proj",
+    "policy": {
+      "version": 2,
+      "enabled": true,
+      "rules": {
+        "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
+        "destructive": { "mode": "ask" },
+        "quiet": { "enabled": true, "roots": ["D:\\work\\proj"], "paths": ["_scratch"] },
+        "secrets": { "mode": "ask" }
+      },
+      "entries": [
+        {
+          "id": "watch-scratch",
+          "tool": ["pwsh"],
+          "mode": "observe",
+          "when": { "cwdUnder": ["D:\\work\\proj"], "commandMatches": "^Remove-Item" }
+        }
+      ]
+    },
+    "io": { "type": "file" },
+    "expect": { "decision": "allow", "quiet": "workspace", "exitCode": 0 },
+    "note": "an observe entry marks the call but must not veto quiet: watching a path cannot turn its cards back on"
+  },
+  {
+    "id": "v2-entry-deny-beats-quiet",
+    "tool": "pwsh",
+    "args": { "command": "Remove-Item 'D:\\work\\proj\\_scratch\\c.txt' -Force" },
+    "cwd": "D:\\work\\proj",
+    "policy": {
+      "version": 2,
+      "enabled": true,
+      "rules": {
+        "protectDshHome": { "mode": "ask", "roots": ["~/.dsh", "~/.agents"] },
+        "destructive": { "mode": "ask" },
+        "quiet": { "enabled": true, "roots": ["D:\\work\\proj"], "paths": ["_scratch"] },
+        "secrets": { "mode": "ask" }
+      },
+      "entries": [
+        {
+          "id": "no-scratch-delete",
+          "tool": ["pwsh"],
+          "mode": "deny",
+          "when": { "cwdUnder": ["D:\\work\\proj"], "commandMatches": "^Remove-Item" }
+        }
+      ]
+    },
+    "expect": { "decision": "block", "rule": "E", "exitCode": 3 },
+    "note": "a stricter entry still wins: quiet only fills the space nothing else claims"
   },
 
   {

@@ -61,9 +61,9 @@ function policyFor(tc) {
 const CASES = cases.filter((tc) => tc.io === undefined);
 
 test('the CLI table covers every case the runtime table covers', () => {
-  const skipped = cases.filter((tc) => tc.io !== undefined).map((tc) => tc.id);
-  assert.deepEqual(skipped, ['quiet-enabled-eligible'],
-    'only the case with a fabricated file can be skipped, and only because this runner has no stat stub');
+  const skipped = cases.filter((tc) => tc.io !== undefined).map((tc) => tc.id).sort();
+  assert.deepEqual(skipped, ['quiet-enabled-eligible', 'quiet-legacy-alias', 'v2-quiet-survives-observe-entry'].sort(),
+    'only cases that need a fabricated file are skipped, and only because this runner has no stat stub');
   assert.ok(CASES.length >= 60);
 });
 

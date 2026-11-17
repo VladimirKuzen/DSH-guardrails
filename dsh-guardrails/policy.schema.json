@@ -48,6 +48,7 @@
             "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } },
             "workspaceQuiet": {
               "type": "object",
+              "description": "Legacy location of rules.quiet; still honoured, but rejected when rules.quiet is also set.",
               "additionalProperties": false,
               "properties": {
                 "enabled": { "type": "boolean" },
@@ -74,6 +75,16 @@
           "properties": {
             "mode": { "type": "string", "enum": ["ask", "deny", "observe", "off", "allow"] },
             "patterns": { "type": "array", "items": { "type": "string", "minLength": 1 } }
+          }
+        },
+        "quiet": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "roots": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "paths": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+            "alwaysAsk": { "type": "array", "items": { "type": "string", "minLength": 1 } }
           }
         },
         "selfProtect": {

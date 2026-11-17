@@ -151,6 +151,14 @@ export function validatePolicy(policy) {
     }
   }
 
+  if (rules.quiet !== undefined && rules.destructive?.workspaceQuiet !== undefined) {
+    errors.push({
+      path: 'rules.quiet',
+      code: 'quiet-duplicate',
+      message: 'workspaceQuiet moved to rules.quiet; keep one of them, not both — two copies would drift and the reader only sees rules.quiet',
+    });
+  }
+
   const entryIds = new Set();
   for (const [index, entry] of (Array.isArray(policy.entries) ? policy.entries : []).entries()) {
     const base = at('entries', index);

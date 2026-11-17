@@ -102,6 +102,24 @@ test('schema: self-protect may observe during development, under version 2 only'
   assert.ok(v1.errors.some((error) => error.code === 'observe-requires-v2'), describeErrors(v1.errors));
 });
 
+test('schema: quiet moved out of the destructive block is accepted', () => {
+  const moved = {
+    version: 2,
+    enabled: true,
+    rules: {
+      destructive: { mode: 'ask' },
+      quiet: {
+        enabled: true,
+        roots: ['D:\\work\\guardrails'],
+        paths: ['_scratch', 'build'],
+        alwaysAsk: ['.git'],
+      },
+    },
+  };
+  const report = validatePolicy(moved);
+  assert.equal(report.ok, true, describeErrors(report.errors));
+});
+
 test('schema: known-bad samples are rejected at the offending path', () => {
   const samples = [
     ['unknown top-level key', { extra: true }, 'extra', 'unknown-key'],
@@ -112,8 +130,22 @@ test('schema: known-bad samples are rejected at the offending path', () => {
       'rules.destructive.workspaceQuiet.alwaysAskk',
       'unknown-key',
     ],
-    ['allow under version 1', { version: 1, rules: { destructive: { mode: 'allow' } } }, 'rules.destructive.mode', 'allow-requires-v2'],
-    ['observe under version 1', { version: 1, rules: { destructive: { mode: 'observe' } } }, 'rules.destructive.mode', 'observe-requires-v2'],
+    [
+      'typo inside rules.quiet',
+      { version: 2, rules: { quiet: { enabled: true, alwaysAskk: [] } } },
+      'rules.quiet.alwaysAskk',
+      'unknown-key',
+    ],
+    [
+      'both quiet locations',
+      {
+        version: 2,
+        rules: { quiet: { enabled: true }, destructive: { mode: 'ask', workspaceQuiet: { enabled: true } } },
+      },
+      'rules.quiet',
+      'quiet-duplicate',
+    ],
+    ['allow under version 1', { version: 1, rules: { destructive: { mode: 'allow' } } }, 'rules.destructive.mode', 'allow-requires-v2'],    ['observe under version 1', { version: 1, rules: { destructive: { mode: 'observe' } } }, 'rules.destructive.mode', 'observe-requires-v2'],
     ['version 3', { version: 3 }, 'version', 'unsupported-version'],
     ['self-protect off', { rules: { selfProtect: { mode: 'off' } } }, 'rules.selfProtect.mode', 'enum'],
     ['self-protect allow', { rules: { selfProtect: { mode: 'allow' } } }, 'rules.selfProtect.mode', 'enum'],

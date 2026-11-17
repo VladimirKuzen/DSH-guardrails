@@ -90,9 +90,9 @@
     "critical": { "mode": "deny", "patterns": [], "failClosed": true },
     "destructive": {
       "mode": "ask",
-      "patterns": [],
-      "workspaceQuiet": { "enabled": false }
+      "patterns": []
     },
+    "quiet": { "enabled": false },
     "secrets": { "mode": "ask", "patterns": [] }
   },
   "entries": [
@@ -215,15 +215,19 @@ evaluate(policy, call, env):
 
 **3. 静默钳制**
 
-`quiet` 的介入条件（`dsh-guardrails/index.js:343`）从“赢家是 R2 且无 severity”收紧为：
+`quiet` 的介入条件（`dsh-guardrails/lib/finalize.js` 的 `applyWorkspaceQuiet`）从“赢家是 R2 且无 severity”收紧为：
 
 ```
 verdict.mode === 'ask'
-&& reasons.every(r => r.rule === 'R2' && r.severity === undefined && r.mode === 'ask')
-&& verdict.secretHit === false
+&& verdict.rule === 'R2'
+&& verdict.severity === undefined
+&& 没有任何一条 reason 比 ask 更严（rank > 2），且所有 rank === 2 的 reason 都是非 critical 的 R2
+&& verdict.secretHit !== true
 ```
 
 否则“在 `_scratch` 删个文件、顺手带上 token”会被静默放行。
+
+**2026-11-17 修正**：原来的写法要求 `reasons` 里**每一条**都是普通 R2，于是任何命中的 `observe` 条目都会把 quiet 关掉——想看住某个目录，反而把这个目录的静默放行取消了，两个特性互相抵消。现改为“更弱的命中不构成否决”：`observe`/`allow` 是“记录”，不是“必须弹卡”。`v2-quiet-survives-observe-entry` 与 `v2-entry-deny-beats-quiet` 两条契约用例把两侧都钉住。
 
 **4. 脱敏钳制（observe 专用，配失败关闭）**
 
@@ -596,6 +600,7 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 | `entries` 是否允许 `mode: "allow"` | **允许，但强制收窄条件**：`when` 非空且至少一个条件；裸 allow 由 schema 拒绝 | 不给 allow 就只能用 quiet 那套硬编码极窄规则；给了则多一个配置级放宽面，所以用 schema 卡住裸 allow（§2.2-3、风险 14）（m00385） |
 | observe 记什么事件 | **新增第六个事件 `observed`** | 复用 `allowed` + `observe:true` 会让每个读日志的人都要记得过滤；新增事件成本近零（`lib/audit/v2.js:5-10` 不校验取值、`tools/audit-report.mjs` 通用遍历）（m00385） |
 | 自保护在开发期能否只记录 | **允许 `observe`（仅 `version: 2`）**，仍拒绝 `off` / `allow` | 开发期自保护会拦我们自己的手脚；observe 恰好能留"本来会弹几次卡"的样本。这不是发布档位，1.5.0 收口前要改回 `ask`（m01689、m02113） |
+| quiet 的配置放哪 | **`rules.quiet`**，`rules.destructive.workspaceQuiet` 作为兼容别名（`lib/policy/merge.js` 的 `applyAliases()` 在任何人读之前搬过去），两处同时出现由 `quiet-duplicate` 拒绝 | 它决定"要不要弹卡"，不是 destructive 匹配器的属性，当初只是 P1.7 先写在那里。挪位置必须保留旧键，否则升级即静默失效；保留别名又必须拒绝重复，否则改哪份生效靠猜（m03546、m03568） |
 
 ---
 

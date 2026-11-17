@@ -65,6 +65,14 @@ export const DEFAULTS = {
   },
 };
 
+/**
+ * Defaults, then the policy file, then the plugin-entry config — with the legacy
+ * `workspaceQuiet` key moved to `rules.quiet`. Every reader sees one location.
+ */
+function buildPolicy(file) {
+  return applyAliases(merge(DEFAULTS, file ?? {}));
+}
+
 /** How long an unanswered `requested` stays in the in-memory pending table. */
 const PENDING_TTL_MS = 10 * 60 * 1000;
 /** Command shapes remembered per session before the oldest is forgotten. */
@@ -86,7 +94,7 @@ function envForRules() {
   };
 }
 
-import { merge } from './lib/policy/merge.js';
+import { applyAliases, merge } from './lib/policy/merge.js';
 
 function readPolicyFile(path) {
   try {
@@ -174,7 +182,7 @@ export function apply(ctx, config = {}) {
     }
   };
 
-  let cache = { at: 0, mtime: -1, policy: merge(DEFAULTS, config.policy ?? {}) };
+  let cache = { at: 0, mtime: -1, policy: buildPolicy(config.policy) };
 
   /** Policy problems already reported: one warning and one audit event per distinct problem. */
   const policyWarned = new Set();
@@ -209,7 +217,7 @@ export function apply(ctx, config = {}) {
     try {
       mtime = statSync(policyPath).mtimeMs;
     } catch {
-      cache = { at: now, mtime: -1, policy: merge(DEFAULTS, config.policy ?? {}) };
+      cache = { at: now, mtime: -1, policy: buildPolicy(config.policy) };
       return cache.policy;
     }
     if (mtime === cache.mtime) return cache.policy;
@@ -224,7 +232,7 @@ export function apply(ctx, config = {}) {
       return cache.policy;
     }
     if (file === null) {
-      cache = { at: now, mtime, policy: merge(DEFAULTS, config.policy ?? {}) };
+      cache = { at: now, mtime, policy: buildPolicy(config.policy) };
       return cache.policy;
     }
     const report = validatePolicy(file);
@@ -238,7 +246,7 @@ export function apply(ctx, config = {}) {
       );
       return cache.policy;
     }
-    cache = { at: now, mtime, policy: merge(DEFAULTS, file) };
+    cache = { at: now, mtime, policy: buildPolicy(file) };
     return cache.policy;
   };
 

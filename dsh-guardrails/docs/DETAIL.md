@@ -130,8 +130,9 @@ To stop asking about a class of commands, lower a whole block's `mode` and keep 
 - `"mode": "observe"` (`version: 2`) lets every hit through and writes an `observed` record — the rehearsal
   mode, for finding out how often a rule would fire before trusting it.
 - `"mode": "allow"` (`version: 2`) lets the block through and writes an `allowed` record.
-- Or enable `destructive.workspaceQuiet` (P1.7): in-workspace deletes stop asking, temp-directory and
-  recursive deletes still do.
+- Or enable `rules.quiet` (P1.7; the old `rules.destructive.workspaceQuiet` still works): in-workspace deletes stop asking, temp-directory and
+  recursive deletes still do. An `observe` entry matching the same call does not switch quiet back off — it is recorded in `reasons`, not
+  treated as a veto.
 - Then add `entries` with `mode: "deny"` for the commands that must stay refused (rank 3 still wins inside
   the block that was relaxed).
 

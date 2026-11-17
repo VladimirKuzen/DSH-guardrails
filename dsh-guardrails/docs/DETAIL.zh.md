@@ -116,7 +116,8 @@
 - `"mode": "observe"`（`version: 2`）全部放行，但写一条 `observed` 记录——预演档，用来看某条规则要是上线
   会多频繁地命中，再决定要不要信任它。
 - `"mode": "allow"`（`version: 2`）全部放行，写一条 `allowed` 记录。
-- 或者打开 `destructive.workspaceQuiet`（P1.7）：工作区内的删除不问，临时目录与递归删除照问。
+- 或者打开 `rules.quiet`（P1.7；旧位置 `rules.destructive.workspaceQuiet` 仍然有效）：工作区内的删除不问，临时目录与递归删除照问。
+  命中同一次调用的 `observe` 条目不会把静默关掉——它只进 `reasons` 留痕，不构成否决。
 - 然后用 `entries` 里 `mode: "deny"` 把必须拦住的命令写回去（rank 3 在放宽过的块里仍然赢）。
 
 `version: 1` 下只有第一条可用：`allow` 被当作 `ask`、`observe` 加载即拒，旧文件保持旧行为。

@@ -16,10 +16,9 @@
  *   `v2Only` cases describe engine v2 behaviour (entries, observe, allow); they
  *   carry their own `"version": 2` policy and run like any other case.
  *
- * Workspace quiet lives in `index.js` rather than in `evaluate()`. The runner
- * mirrors that wiring with the same two helpers (`collectFacts`, `decideQuiet`
- * in the same order); when P3 extracts the finalize step, this block can call it
- * instead of reproducing the order.
+ * Workspace quiet lives in `lib/finalize.js`, not in `evaluate()`. The runner
+ * calls the same `applyWorkspaceQuiet()` the host and the CLI call, so quiet can
+ * only drift if that one module changes.
  */
 
 import test from 'node:test';
@@ -28,7 +27,8 @@ import { readFileSync } from 'node:fs';
 
 import { evaluate } from '../rules.js';
 import { collectFacts } from '../lib/facts.js';
-import { decideQuiet } from '../lib/rules/quiet.js';
+import { applyAliases } from '../lib/policy/merge.js';
+import { applyWorkspaceQuiet, factRoots } from '../lib/finalize.js';
 
 const CASES = JSON.parse(
   readFileSync(new URL('./fixtures/contract-cases.json', import.meta.url), 'utf8'),
@@ -66,40 +66,27 @@ function decisionOf(verdict) {
 
 /** Run one case exactly the way the host runs a tool call, minus audit and events. */
 function decide(tc) {
-  const policy = tc.policy ?? DEFAULT_POLICY;
+  const policy = applyAliases(tc.policy ?? DEFAULT_POLICY);
   const call = { name: tc.tool, arguments: tc.args };
   // `cwd` is what index.js passes as env.CWD; entries and relative paths need it.
   const env = { ...BASE_ENV, ...(tc.cwd === undefined ? {} : { CWD: tc.cwd }), ...(tc.env ?? {}) };
 
-  let verdict = evaluate(policy, call, env);
+  const verdict = evaluate(policy, call, env);
+  if (verdict === null || verdict === undefined) return verdict;
 
-  // Same gate as index.js: only an ordinary R2 ask can be quieted, and under v2
-  // every reason must be an ordinary R2 with no secret in the call.
-  const onlyOrdinaryR2 = verdict?.reasons === undefined
-    || verdict.reasons.every((reason) => reason.rule === 'R2' && reason.severity === undefined);
-  if (verdict !== null && verdict.mode === 'ask' && verdict.rule === 'R2' && verdict.severity === undefined
-    && onlyOrdinaryR2 && verdict.secretHit !== true) {
-    const roots = policy.rules?.protectDshHome?.roots ?? ['~/.dsh', '~/.agents'];
-    // Quiet needs the target to exist as a single file; `io` stubs that stat so
-    // the table does not depend on files on the machine that runs it.
-    const io = tc.io === undefined
-      ? undefined
-      : {
-          statSync: () => ({ isDirectory: () => tc.io.type === 'dir' }),
-          readdirSync: () => ['a', 'b'],
-        };
-    const facts = collectFacts(call, verdict, env, io === undefined ? { roots } : { roots, io });
-    const quiet = decideQuiet({
-      tool: tc.tool,
-      command: tc.args?.command,
-      facts,
-      config: policy.rules?.destructive?.workspaceQuiet,
-      cwd: tc.cwd ?? null,
-    });
-    if (quiet.quiet) verdict = { ...verdict, mode: 'allow', quiet: 'workspace' };
-  }
+  // Quiet needs the target to exist as a single file; `io` stubs that stat so
+  // the table does not depend on files on the machine that runs it.
+  const io = tc.io === undefined
+    ? undefined
+    : {
+        statSync: () => ({ isDirectory: () => tc.io.type === 'dir' }),
+        readdirSync: () => ['a', 'b'],
+      };
+  const roots = factRoots(policy, env);
+  const facts = collectFacts(call, verdict, env, io === undefined ? { roots } : { roots, io });
 
-  return verdict;
+  // The same finalize step the host and the CLI call: not a re-implementation.
+  return applyWorkspaceQuiet({ policy, call, verdict, facts, cwd: tc.cwd ?? null }).verdict;
 }
 
 function describeVerdict(verdict) {
