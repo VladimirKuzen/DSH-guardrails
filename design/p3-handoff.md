@@ -5,16 +5,21 @@
 的对应小节。路线图原文在仓库外的
 `D:\work\DSH-guardrails-DOCS\implementation-plan.md`（§6 是 P3 的原始条目）。
 
-## 0. 现状快照（2026-11-16）
+## 0. 现状快照（2026-11-17，P3 收口后）
 
-- 插件版本 **1.4.0**；`main = c3d17ae`；工作树干净。
-- tag：`v1.1.0-baseline`、`p1-readability`、`p1.6`、`v1.3.2`、`v1.4.0`、`p2`（版本线与里程碑线并行，已推的 tag 不改名不覆盖）。
-- 测试：8 个文件 **128 条**全过（rules 27 / facts 22 / describe 15 / replay 3 / critical 15 / audit 11 / quiet 19 / smoke 16）。
-- 判定入口：`dsh-guardrails/index.js`（`tools/pre-execute`），规则实现按顺序拆在
-  `lib/rules/r3-secrets.js` → `lib/rules/r1-home.js` → `lib/rules/r2-destructive.js`，共享工具在
-  `lib/rules/kit.js`；`rules.js` 只剩 `evaluate` 与 `criticalFallback`。
-- 审计：`lib/audit/v2.js`（事件流 + payload + 哈希链）、`tools/audit-report.mjs`（离线读取/校验）。
+- 插件版本 **1.5.0**；`main = 82cdcd7`（`v1.5.0` 与 `p3` 都指向它）；工作树干净。
+- tag：`v1.1.0-baseline`、`p1-readability`、`p1.6`、`v1.2.2`、`v1.3.2`、`v1.4.0`、`p2`、
+  `p3-engine`（引擎 v2 那一步）、`v1.5.0` + `p3`（收口，版本线与里程碑线并行，已推的 tag 不改名不覆盖）。
+- 测试：17 个文件 **400 条**全过（rules 34 / facts 29 / describe 17 / replay 3 / critical 15 /
+  audit 11 / quiet 19 / finalize 9 / dry-run 10 / redact 9 / self-protect 22 / policy-schema 10 /
+  engine-v2 19 / contract 73 / examples 4 / cli 78 / smoke 38）。
+- 判定入口：`dsh-guardrails/index.js`（`tools/pre-execute`）；`rules.js` 按引擎版本分派，
+  v1 逐条短路、v2 收集后按 rank 取赢家。带序：R3 → R1 home → R1 self → R2 critical →
+  R2 destructive → `entries`，之后是 quiet 与预演。
+- 审计：`lib/audit/v2.js`（事件流 + payload + 哈希链；`observed` 事件、脱敏、密钥不写哈希）。
 - 卡片文案：`lib/facts.js` + `lib/describe.js` + `i18n/{zh,en}.json`。
+- 文档：`dsh-guardrails/docs/` 下的 `ARCHITECTURE` / `DSH-API` / `POLICY`（双语）/ `DETAIL`（双语）。
+- 未收口项见本文 §7 与 `design/p3-policy-v2.md` §11（`apply_patch` 参数形状、`observe` 的宿主放行流程）。
 
 ## 1. 必须保持的不变量
 

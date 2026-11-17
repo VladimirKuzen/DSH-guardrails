@@ -651,10 +651,10 @@ live 验收第 ③ 步（`entries` + `cwdUnder`）**静默不命中**：审计�
 
 ## 12. 与既有文档的同步点
 
-| 文档 | 要改什么 | 时机 |
+| 文档 | 要改什么 | 状态（2026-11-17） |
 |---|---|---|
-| `design/p2-audit-v2.md` §4.1 | 若拍板新增 `observed`，补一行事件表；§4.3 公共字段补 `reasons/secretHit/policyVersion` | 第 3 步 |
-| `design/p3-handoff.md` §0 | 版本、基线提交、tag、测试条数快照 | 收口时 |
-| `design/p3-handoff.md` §6 | 指向本文 | 第 1 步（可提前） |
-| `D:\work\DSH-guardrails-DOCS\implementation-plan.md` §6 | 勾选条目、把本文列进产出 | 收口时 |
-| `dsh-guardrails/docs/` | 威胁模型：非沙箱、已知绕过、`policy.json` 是受信输入 | 第 5 步 |
+| `design/p2-audit-v2.md` §4.1 | 事件表加 `observed`；公共字段补 `reasons/secretHit/policyVersion/entryId/reasonsTruncated/redacted` | 已改（第 3 步） |
+| `design/p3-handoff.md` §0 | 版本、基线提交、tag、测试条数快照 | 已改（收口：1.5.0 / `82cdcd7` / 17 文件 400 条） |
+| `design/p3-handoff.md` §6 | 指向本文 | 已改（标注“本文已过期”并指向 §7.6） |
+| `D:\work\DSH-guardrails-DOCS\implementation-plan.md` §6 | 勾选条目、把本文列进产出 | **未做**：仓库外文档，需要用户确认后再改（改它同样是一次 R1 写入） |
+| `dsh-guardrails/docs/` 威胁模型 | 非沙箱、已知绕过、`policy.json` 是受信输入 | 已并入三处，**不单建文件**：`README.md` 的 Limits、`docs/DSH-API.md` 的“宿主不给插件做的事”、`docs/POLICY.md` 的“需要知道的边界”。单建一份只会多一个会漂移的副本 |
