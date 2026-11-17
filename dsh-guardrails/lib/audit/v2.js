@@ -175,6 +175,9 @@ export class AuditLog {
       ...(input.quiet === undefined ? {} : { quiet: input.quiet }),
       prevHash,
     };
+    // A policy problem is only actionable if the record says which one it was.
+    if (input.reason !== undefined) record.reason = input.reason;
+    if (input.detail !== undefined) record.detail = input.detail;
     record.hash = recordHash(prevHash, record);
 
     const file = join(this.dir, `${day}.jsonl`);

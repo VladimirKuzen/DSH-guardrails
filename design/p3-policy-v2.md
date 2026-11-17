@@ -542,6 +542,21 @@ live 首测证据（2026-11-16 23:13，重启后）：`write` 绝对路径写入
 
 实测：`lib/redact.js` 9 条、`test/plugin.smoke.mjs` 32 条、`test/engine-v2.test.mjs` 19 条、`test/audit.test.mjs` 11 条；**15 个文件 370 条全绿**（rules 34、facts 26、describe 17、replay 3、critical 15、audit 11、quiet 19、dry-run 10、redact 9、self-protect 22、policy-schema 9、engine-v2 19、contract 70、cli 77、smoke 32）。
 
+### 7.5 `cwdUnder` 的真实来源（2026-11-17 live 验收发现）
+
+live 验收第 ③ 步（`entries` + `cwdUnder`）**静默不命中**：审计记录里 `cwd` 与 `cwdSource` 都是 `null`，`reasons` 只有 `R2`。查证结果：
+
+- 宿主 `ToolExecutionInput`（`app.asar` 内 `docs/subsystems/tools.md` §Execution）**没有 cwd 字段**；cwd 随 session 走。
+- 实测（2026-11-17，诊断写进审计 `detail`）：session 上没有 `meta`（为 `null`）、没有 `cwd`，但有 **`header`**；对应会话库布局 `~/.dsh/sessions/<编码过的 cwd>/session-<uuid>/`（目录名即 `f(header.cwd)`）。
+- 因此正确读法是 `exec.agent.session.header.cwd`（`meta.cwd` 与 shell 的 `workdir` 作兜底）。`index.js` 的 `resolveCwd` 原先只读 `session.cwd` → 在本安装里恒为 `null`，`cwdUnder` 条目永不命中且**不报错**。
+- 修法两条并列：① `resolveCwd` 按 `session.header.cwd → session.meta.cwd → session.cwd → shell workdir` 取；② 新增 `warnIfCwdRequired(policy, cwd)`——策略里有 `when.cwdUnder` 条目而本次调用拿不到 cwd 时，按 `reportPolicyProblem('cwd-unavailable', …)` 只报一次。
+- 诊断方法：把 `session` 的 keys / `meta` / `header` 写进 `config-invalid` 的 `detail`，重启后读一条记录即可定性（本次就是这么找到 `header` 的）；诊断代码用完即摘。
+- 附带发现并修掉：`lib/audit/v2.js` 的 `append()` 白名单**丢掉了 `reason` / `detail`**，于是 `config-invalid` 记录只有事件名、查不出成因（早先那两条 BOM 与旧 schema 的记录因此无法自解释）。现在两者在 `input` 提供时落盘，`design/p2-audit-v2.md` 字段表已同步。
+- live 复核（2026-11-17 16:34）：记录里 `cwd` 为 `D:\work\guardrails`、`cwdSource: "session"`；临时装进策略的 `cwd-probe` 条目真命中，返回 `Guardrails E: entry "cwd-probe" forbids this call.`，审计 `rule: "E"`、`entryId: "cwd-probe"`、`outcome: "denied"`，无卡。验证后策略已还原、临时文件已删、诊断代码已摘。
+- 测试：`test/plugin.smoke.mjs` 新增两条（`meta.cwd` 被记录并驱动 `cwdUnder` 命中；无 cwd 时只写一条 `config-invalid`）。
+
+实测：**16 个文件 394 条全绿**（rules 34、facts 29、describe 17、replay 3、critical 15、audit 11、quiet 19、dry-run 10、redact 9、self-protect 22、policy-schema 10、engine-v2 19、finalize 9、contract 73、cli 78、smoke 36）。
+
 ---
 
 ## 8. 验收矩阵（可执行条目）

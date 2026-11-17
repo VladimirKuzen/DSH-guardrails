@@ -586,4 +586,53 @@ test('v2 allow mode: the call runs and is recorded as allowed', async () => {
   assert.ok(Array.isArray(record.reasons));
 });
 
+// --- cwd: the session workspace lives in `session.meta.cwd` ------------------
+
+/** A call whose agent session carries a workspace, the way the desktop host does. */
+const callWithWorkspace = (sessionId, cwd, name, args, callId) => ({
+  name,
+  arguments: args,
+  agent: { session: { id: sessionId, meta: { cwd } } },
+  ...(callId === undefined ? {} : { callId }),
+});
+
+const cwdUnderPolicy = (extra = {}) =>
+  v2Policy({
+    entries: [
+      {
+        id: 'proj-writes',
+        tool: ['write'],
+        mode: 'deny',
+        when: { cwdUnder: ['C:\\work\\proj'] },
+      },
+    ],
+    ...extra,
+  });
+
+test('cwd: session.meta.cwd is recorded and drives a cwdUnder entry', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy(cwdUnderPolicy());
+  const ctx = fakeCtx();
+  const decision = await ctx.pre(
+    callWithWorkspace('s-cwd-1', 'C:\\work\\proj', 'write', { file_path: 'C:\\work\\proj\\a.txt', content: 'x' }, 'cc1'),
+    next,
+  );
+  assert.equal(decision.kind, 'deny');
+  assert.equal(decision.info.code, 'E');
+  const record = auditLines().find((r) => r.callId === 'cc1');
+  assert.equal(record.cwd, 'C:\\work\\proj');
+  assert.equal(record.cwdSource, 'session');
+});
+
+test('cwd: a cwdUnder entry that cannot see a cwd is reported once, not silently inert', async () => {
+  rmSync(join(dir, 'audit'), { recursive: true, force: true });
+  writePolicy(cwdUnderPolicy());
+  const ctx = fakeCtx();
+  assert.equal((await ctx.pre(call('pwsh', { command: 'Get-Date' }, 'cc2'), next)).kind, 'allow');
+  assert.equal((await ctx.pre(call('pwsh', { command: 'Get-Date' }, 'cc3'), next)).kind, 'allow');
+  const warnings = auditLines().filter((r) => r.event === 'config-invalid' && r.reason === 'cwd-unavailable');
+  assert.equal(warnings.length, 1);
+  assert.match(warnings[0].detail, /cwdUnder/);
+});
+
 

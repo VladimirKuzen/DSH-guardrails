@@ -125,6 +125,8 @@ model 发起工具调用
 | `redacted` | array \| 省略 | P3：`observe` 的密钥 payload 里被替换掉的形状标签（如 `["openai"]`），文件里对应 `<redacted:openai>` |
 | `secretHit` | bool \| 省略 | P3：本次调用是否命中过密钥形状；为真时 payload 走 R3 形状（不落原文），**即使赢家不是 R3** |
 | `policyVersion` | `1｜2` \| 省略 | P3：判定时用的引擎版本 |
+| `reason` | string \| 省略 | 2026-11-17：`config-invalid` 记录的成因标签（`unreadable` / `config-invalid` / `self-protect-root` / `cwd-unavailable`）；以前只在 `logger.warn` 里，审计里查不到 |
+| `detail` | string \| 省略 | 2026-11-17：与 `reason` 配套的可读说明（文件路径 + 字段错误，或 cwdUnder 为何不命中） |
 
 各事件额外字段：
 

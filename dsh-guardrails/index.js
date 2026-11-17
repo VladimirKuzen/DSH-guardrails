@@ -311,7 +311,11 @@ export function apply(ctx, config = {}) {
    * value the reader would misread.
    */
   const resolveCwd = (exec) => {
-    const sessionCwd = exec?.agent?.session?.cwd;
+    // The workspace is part of the session header (`header.cwd`); `meta.cwd` is
+    // what a created agent passes in, and `session.cwd` is an older shape. Accept
+    // all three so the record names the workspace whenever the host knows it.
+    const session = exec?.agent?.session;
+    const sessionCwd = session?.header?.cwd ?? session?.meta?.cwd ?? session?.cwd;
     if (typeof sessionCwd === 'string' && sessionCwd !== '') {
       return { cwd: sessionCwd, cwdSource: 'session' };
     }
@@ -320,6 +324,23 @@ export function apply(ctx, config = {}) {
       return { cwd: workdir, cwdSource: 'tool' };
     }
     return { cwd: null, cwdSource: null };
+  };
+
+  /**
+   * A `when.cwdUnder` entry cannot match without a cwd, and silence is the worst
+   * outcome for a rule the user believes is live — so say it once per process.
+   */
+  const warnIfCwdRequired = (policy, cwd) => {
+    if (typeof cwd === 'string' && cwd !== '') return;
+    if (!Array.isArray(policy?.entries)) return;
+    const wants = policy.entries.some(
+      (entry) => Array.isArray(entry?.when?.cwdUnder) && entry.when.cwdUnder.length > 0,
+    );
+    if (!wants) return;
+    reportPolicyProblem(
+      'cwd-unavailable',
+      'entries with when.cwdUnder cannot match: this call carried no session cwd',
+    );
   };
 
   const fieldsFor = (exec, verdict, facts, displayReason) => ({
@@ -356,6 +377,7 @@ export function apply(ctx, config = {}) {
     try {
       policy = loadPolicy();
       if (policy.enabled === false) return next();
+      warnIfCwdRequired(policy, resolveCwd(exec).cwd);
       // CWD lets the path rules resolve relative targets: `write` with
       // "file_path": "lib/x.js" must not slip past a prefix check.
       verdict = evaluate(

@@ -110,6 +110,10 @@
 "这条被显式声明允许"（rank 0）。卡片上用中文说人话（`自定义规则 no-dist-delete 禁止此调用`），
 审计记录里仍是 `rule: "E"` 加 `entryId`，全部命中在 `reasons[]` 里。
 
+`cwdUnder` 比的是会话的工作区，宿主把它存在 session header 里（`session.header.cwd`；`meta.cwd` 与 shell
+调用自带的 `workdir` 是兜底）。都拿不到时条目不可能命中，于是第一次这样的调用会写一条 `config-invalid`
+记录说明原因——一条永远不会触发的规则不该看起来像还在生效。
+
 ## 想放宽时
 
 要让某一类命令不再弹审批，走"降块级 `mode`，再把危险的那几条捞回来"：

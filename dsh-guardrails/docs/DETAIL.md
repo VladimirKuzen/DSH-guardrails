@@ -124,6 +124,11 @@ clears a built-in hit — it only records "this was declared allowed" (rank 0). 
 words (`Custom rule no-dist-delete blocks this call`), while the audit record keeps `rule: "E"` and
 `entryId`, plus every hit in `reasons[]`.
 
+`cwdUnder` compares against the session's workspace, which the host keeps in the session header
+(`session.header.cwd`; `meta.cwd` and a shell call's `workdir` are the fallbacks). When none is available
+the entry cannot match, so the first such call writes one `config-invalid` record saying so — a rule that
+cannot fire should not look live.
+
 ## Relaxing a rule
 
 To stop asking about a class of commands, lower a whole block's `mode` and keep the dangerous subset caught:

@@ -6,6 +6,20 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 
 ## [Unreleased]
 
+- `cwdUnder` entries read the workspace from the session header (`session.header.cwd`; `meta.cwd` and a
+  shell call's `workdir` are the fallbacks). It used to read `session.cwd`, which this host never populates,
+  so a `cwdUnder` entry was silently inert. When a cwdUnder entry exists but no cwd can be resolved, one
+  `config-invalid` record now says so instead of staying quiet.
+- `config-invalid` audit records keep `reason` and `detail`. They were being dropped by the writer's field
+  whitelist, leaving a record that said something went wrong but never what.
+- The card follows a literal held in a variable: `$p = 'D:\work\a.txt'; Remove-Item $p` now names
+  `D:\work\a.txt` (and no longer asks for a dry run) instead of reporting an unnamed target. An `$env:`
+  value is still not guessed — it is not written in the command.
+- Workspace quiet now lives at `rules.quiet`; `rules.destructive.workspaceQuiet` keeps working as an alias
+  (a file that sets both is refused, so there is never a question of which copy wins). The setting decides
+  whether a card is shown at all, so it is not a property of the destructive matcher. An `observe` entry
+  matching the same call no longer switches quiet off: weaker matches are recorded in `reasons`, they do
+  not veto.
 - R1 self-protection (`rules.selfProtect`): a write, or a shell command carrying a write verb, that targets
   the plugin's own directory (plus any extra root in `paths`) now asks before running. `apply_patch` is
   covered as well by reading its `*** Update File:` targets out of the patch text. The mode accepts only

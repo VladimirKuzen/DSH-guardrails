@@ -6,6 +6,16 @@
 
 ## [未发布]
 
+- `cwdUnder` 条目改为从 session header 取工作区（`session.header.cwd`；`meta.cwd` 与 shell 调用自带的
+  `workdir` 是兜底）。原先读 `session.cwd`，而本宿主从不填它，等于这类条目静默失效。策略里有
+  `cwdUnder` 条目却拿不到 cwd 时，会写一条 `config-invalid` 记录说明，而不是继续沉默。
+- `config-invalid` 审计记录会保留 `reason` 与 `detail`：写入器的字段白名单把它们丢了，于是记录只说
+  "出了问题"、从不说"出了什么问题"。
+- 卡片会跟随变量里的字面量：`$p = 'D:\work\a.txt'; Remove-Item $p` 现在直接写出 `D:\work\a.txt`
+  （也不再要求预演），不再报"目标未知"。`$env:` 的值仍然不替它猜——它没写在命令里。
+- 工作区静默挪到 `rules.quiet`（旧的 `rules.destructive.workspaceQuiet` 仍然有效，两处都写会被拒绝，
+  免得"哪份生效"靠猜）：它决定的是要不要弹卡，不是破坏性匹配器的属性。命中同一次调用的 `observe`
+  条目不再把静默关掉——更弱的命中只进 `reasons` 留痕，不构成否决。
 - R1 自保护（`rules.selfProtect`）：写入、或带写动词的 shell 命令落在插件自身目录（以及 `paths` 里追加的根）
   时先弹卡。`apply_patch` 也被覆盖——它没有路径参数，从补丁文本里的 `*** Update File:` 行读目标。
   这个开关只接受 `ask` / `deny`：一个能被它保护的文件关掉的开关不算护栏。它抬高的是“用工具改门禁”的成本，
