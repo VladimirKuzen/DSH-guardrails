@@ -73,7 +73,9 @@ Two rules keep that honest when the command is not a single tidy action:
   setup step would hide the irreversible one.
 - **A target set by a variable is named as such.** When the path comes from a variable the card says
   `target set by a variable` and, after a dry run, `see the read-only listing above` — it never silently
-  drops the segment, which used to read as "no target at all".
+  drops the segment, which used to read as "no target at all". A literal assigned earlier in the same
+  command counts as known: `$p = 'D:\work\a.txt'; Remove-Item $p` names `D:\work\a.txt`. An `$env:` value
+  is not filled in — it is not written in the command, so the card still says the target is variable.
 
 The card still cannot show the command itself: the host renders the tool call separately and truncates long
 arguments, and approval requests carry no body of our own. Compressing the command into facts is therefore

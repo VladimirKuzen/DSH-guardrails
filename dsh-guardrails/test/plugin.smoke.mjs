@@ -412,6 +412,28 @@ test('dry run: a differently shaped command is its own first attempt', async () 
   assert.equal((await ctx.pre(callAs('s-4', 'pwsh', other), next)).kind, 'deny');
 });
 
+test('dry run: a path held in a variable is named, so the first attempt is a card', async () => {
+  const work = join(dir, 'work');
+  mkdirSync(work, { recursive: true });
+  const victim = join(work, 'named.txt');
+  writeFileSync(victim, 'x', 'utf8');
+  writePolicy(dryRunPolicy());
+  const ctx = fakeCtx();
+
+  // The literal is in the command; a dry run here would ask for a listing of a
+  // path the card can already show (live finding, 2026-11-17).
+  const decision = await ctx.pre(
+    callAs('s-6', 'pwsh', { command: `$p = '${victim}'\nRemove-Item -LiteralPath $p -Force` }),
+    next,
+  );
+  assert.equal(decision.kind, 'ask');
+  assert.ok(decision.displayReason.zh.includes('named.txt'), decision.displayReason.zh);
+
+  const requested = auditLines().filter((r) => r.sessionId === 's-6').find((r) => r.event === 'requested');
+  assert.equal(requested.facts.target, victim);
+  assert.equal(requested.facts.dryRun, undefined);
+});
+
 test('dry run: the refusal is audited as a deny with facts.dryRun=required', async () => {
   writePolicy(dryRunPolicy());
   const ctx = fakeCtx();

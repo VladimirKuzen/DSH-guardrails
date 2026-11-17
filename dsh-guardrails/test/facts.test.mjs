@@ -267,6 +267,40 @@ test('facts: a resolved target is not marked dynamic', () => {
   assert.equal(facts.dynamic, undefined);
 });
 
+test('facts: a literal assigned to a variable earlier in the command is the target', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: "$target = 'C:\\work\\a.txt'\nRemove-Item -LiteralPath $target -Force" },
+  });
+  assert.equal(facts.kind, 'delete');
+  assert.equal(facts.target, 'C:\\work\\a.txt');
+  assert.equal(facts.dynamic, undefined);
+});
+
+test('facts: braced names and Join-Path assignments are followed', () => {
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: {
+      command: "$p = Join-Path $env:USERPROFILE '.dsh\\x.txt'\nRemove-Item -LiteralPath ${p} -Force",
+    },
+  });
+  assert.equal(facts.target, 'C:\\Users\\Tester\\.dsh\\x.txt');
+  assert.equal(facts.dynamic, undefined);
+  assert.equal(facts.protectedHit, true);
+});
+
+test('facts: an environment variable is not resolved from the command', () => {
+  // `$env:TEMP` is not written in the command, so it stays unknown even though
+  // the process has a TEMP value. Guessing here would let quiet cover a path the
+  // card never showed.
+  const facts = factsOf({
+    name: 'pwsh',
+    arguments: { command: 'Remove-Item -LiteralPath "$env:TEMP\\a.txt" -Force' },
+  });
+  assert.equal(facts.target, '');
+  assert.equal(facts.dynamic, true);
+});
+
 test('displayPath and clipPath keep the value readable', () => {
   assert.equal(displayPath('$env:USERPROFILE\\.dsh\\x', env), 'C:\\Users\\Tester\\.dsh\\x');
   assert.equal(displayPath('~/.dsh/y', env), 'C:\\Users\\Tester\\.dsh\\y');

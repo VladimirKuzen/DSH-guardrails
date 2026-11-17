@@ -12,7 +12,7 @@
 import { readdirSync, statSync } from 'node:fs';
 
 import { expandPath } from '../rules.js';
-import { writtenPathUnder } from './rules/kit.js';
+import { assignmentsOf, writtenPathUnder } from './rules/kit.js';
 
 const PATH_TOOLS = new Set(['write', 'edit', 'create_file', 'apply_patch']);
 const SHELL_TOOLS = new Set(['pwsh', 'bash']);
@@ -105,6 +105,26 @@ export function displayPath(raw, env) {
 /** A value still carrying a variable is not a usable target. */
 export function isUnresolved(value) {
   return value.includes('$') || /%[A-Za-z_][A-Za-z0-9_]*%/.test(value);
+}
+
+/**
+ * Follow a plain `$name` the command assigned to a literal earlier.
+ *
+ * `$p = 'D:\work\a.txt'; Remove-Item $p` names its target in the command, but
+ * the card said "target set by a variable" until 2026-11-17 — the dry run fired
+ * on a path that was sitting in plain sight. Only plain names are followed,
+ * never `$env:NAME`: an environment value is not written in the command, and
+ * treating it as known would let quiet cover a path the card never showed.
+ */
+function followVariables(value, command) {
+  const text = str(value);
+  if (text === '' || !text.includes('$')) return text;
+  const vars = assignmentsOf(command);
+  if (vars.size === 0) return text;
+  return text.replace(
+    /\$\{([A-Za-z_][A-Za-z0-9_]*)\}|\$(?!env:)([A-Za-z_][A-Za-z0-9_]*)/gi,
+    (match, braced, plain) => vars.get(str(braced || plain).toLowerCase()) ?? match,
+  );
 }
 
 /** Shorten a path for the headline; the audit log keeps the full value. */
@@ -307,14 +327,16 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
         ? pathArgument(args)
         : commandTarget(action.statement, { unix: name === 'bash' });
 
-  const shown = displayPath(rawTarget, env);
+  // A literal held in a variable earlier in the command is still the target.
+  const named = followVariables(rawTarget, command);
+  const shown = displayPath(named, env);
   // A target still carrying a variable cannot be named. Say so instead of
   // silently dropping the segment: "delete, target unknown" is still a fact.
   const unresolved = shown !== '' && isUnresolved(shown);
   const target = unresolved ? '' : shown;
   const dynamic = unresolved ? true : undefined;
   // A wildcard means the text names a pattern, not one key or file.
-  const wildcard = /[*?]/.test(rawTarget) ? true : undefined;
+  const wildcard = /[*?]/.test(named) ? true : undefined;
   const lineCount = shell ? command.split(/\r?\n/).filter((line) => line.trim() !== '').length : 0;
 
   const stat = target === '' ? undefined : safeStat(io, target);
@@ -350,7 +372,7 @@ export function collectFacts(call, verdict, env = {}, options = {}) {
     reversible,
     registryAction,
     wildcard,
-    protectedHit: protectedTarget !== '' ? true : underRoots(expandPath(rawTarget, env), roots),
+    protectedHit: protectedTarget !== '' ? true : underRoots(expandPath(named, env), roots),
     secretLabel: verdict?.rule === 'R3' ? str(verdict.label) : '',
     severity: criticalCategory === '' ? undefined : 'critical',
     criticalCategory,
