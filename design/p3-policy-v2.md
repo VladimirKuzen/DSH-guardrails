@@ -324,7 +324,7 @@ observe 命中 R3 时，payload 必须先脱敏再落盘：
 ### 4.1 调用形态
 
 ```powershell
-$node = "C:\Users\<you>\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe"
+$node = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe"
 
 & $node dsh-guardrails/tools/check.mjs --tool pwsh --args '{"command":"Remove-Item -Recurse D:\\work\\dist"}'
 & $node dsh-guardrails/tools/check.mjs --tool pwsh --args '{...}' --cwd 'D:\work\proj' --json
@@ -640,7 +640,7 @@ live 验收第 ③ 步（`entries` + `cwdUnder`）**静默不命中**：审计�
 
 ## 11. 未验证项（不写“应该没问题”）
 
-1. `apply_patch` 的真实参数形状——宿主 checkout `C:\Users\<you>\AppData\Local\Programs\DeepSeek Harness\resources\app.asar\dsh\` 在本机不存在（路径无效），读不到定义。**2026-11-16 更新**：自保护侧已用"扫描所有字符串参数里的 `*** File:` 行"绕开这个未知（§7.1 第 2 条）；仍未验证的是宿主到底把补丁放在哪个键、以及 R1home 的 `gap-apply-patch-delete-dsh` 是否要同法修补。
+1. `apply_patch` 的真实参数形状——宿主 checkout `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\app.asar\dsh\` 在本机不存在（路径无效），读不到定义。**2026-11-16 更新**：自保护侧已用"扫描所有字符串参数里的 `*** File:` 行"绕开这个未知（§7.1 第 2 条）；仍未验证的是宿主到底把补丁放在哪个键、以及 R1home 的 `gap-apply-patch-delete-dsh` 是否要同法修补。
 2. observe 场景返回 `next()` 是否与 allow 完全等价——按 `tools/pre-execute` 契约推断，未 live 验证。**2026-11-17 更新**：mount 级测试已确认 `decision.kind === 'allow'` 且审计只有 `observed` 一条（不是 `allowed`），但宿主真实放行流程仍未 live 走一遍。
 6. **observe × R3 脱敏的宿主 live 验证**（2026-11-17 新增）——**同日已验**：临时把 `~/.dsh/guardrails/policy.json` 的 `rules.secrets.mode` 改成 `observe`，跑 `Write-Output "sk-…"`：无卡、无拦截，审计一条 `event:"observed"`、`rule:"R3"`、`mode:"observe"`、`redacted:["openai"]`、`payloadBytes:32`；落盘 payload 正文是 `Write-Output "<redacted:openai>"`，sha256 与记录一致，全审计目录搜 token 0 次。再给 `patterns` 加一条命中占位符的 `redacted` 后重跑：`payloadRef`/`payloadSha256` 均 `null`、`payloadBytes` 是原文长度、`redacted` 仍列标签（失败关闭生效）。验完已把 `mode` 改回 `ask`、`patterns` 清空，并确认同一条命令重新变成 R3 deny（`payloadSha256:null`、token 0 次）。
 3. ~~自保护在 junction/软链加载下的真实路径~~ —— **2026-11-16 已验**：profile 里 `@vlad/dsh-guardrails` 是指向工作区的 junction，`realpathSync` 解析出 `D:\work\guardrails\dsh-guardrails`，`assertSelfRoot` 通过。

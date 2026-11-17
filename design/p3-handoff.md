@@ -53,7 +53,7 @@
 - **审计 target 按码点截断**，不要退回字节截断（会切坏中文）。
 - **confined shell 删 Medium 完整性文件会失败**（`diagnose-windows-sandbox-acl` 判 `NOT_THIS_CLASS` 时不要改 ACL）。
 - **`npm` 不在 PATH**：测试用 bundled node 逐文件跑
-  `C:\Users\<you>\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe`。
+  `%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe`。
 - **中文字符串不要进 `Set-Content`**：一次批量替换把两份 README 写成了乱码，已从 git 还原；中文改动走编辑工具。
 - **改插件代码必须重启 DSH**，并用 `~/.dsh/guardrails/loaded.json` 的 `version` + mtime 核对（pid 不可信）。
 - **删 `audit/v2` 目录**会让新链以非 `genesis` 开头；要轮换就让用户手动删，或先停插件。
@@ -62,7 +62,7 @@
 ## 4. 测试与 live 流程
 
 ```powershell
-$node = "C:\Users\<you>\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe"
+$node = "$env:USERPROFILE\.dsh\dsh-runtimes\dsh-primary-runtime\dependencies\node\bin\node.exe"
 cd dsh-guardrails
 & $node test/rules.test.mjs      # 顺序：rules → facts → describe → replay → critical → audit → quiet → plugin.smoke
 & $node test/plugin.smoke.mjs

@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { dirname } from 'node:path';
 
 import { evaluate } from '../rules.js';
 import { assertSelfRoot, evaluateR1Self, pluginRoot, selfRoots } from '../lib/rules/r1-self.js';
@@ -179,7 +180,8 @@ test('self: a patch outside the protected roots is untouched', () => {
 
 test('self: a relative tool path is resolved against the session cwd', () => {
   const relative = call('write', { file_path: 'dsh-guardrails\\rules.js', content: 'x' });
-  const withCwd = { ...env, CWD: 'D:\\work\\guardrails' };
+  // The checkout's parent: derived from this file, so the test does not depend on where the repo lives.
+  const withCwd = { ...env, CWD: dirname(root) };
   assert.equal(evaluate(policy({ mode: 'ask', paths: [] }), relative, withCwd)?.sub, 'self');
   // Without a known cwd the relative path cannot be placed anywhere, so nothing fires.
   assert.equal(evaluate(policy({ mode: 'ask', paths: [] }), relative, env), null);
