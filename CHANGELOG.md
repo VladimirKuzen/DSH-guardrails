@@ -28,6 +28,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 - `dsh-guardrails/` now ships its own `README.md` and `LICENSE`. npm only includes files from the package
   directory, so the tarball previously carried neither the readme the npm page renders nor the license text.
   `pnpm pack` now shows 40 entries, with no `test/` or `design/` files.
+- CI: `.github/workflows/test.yml` runs the suite and the `check` CLI smoke (`git reset --hard` must exit 2) on
+  `windows-latest` with Node 24. Both actions are pinned to commit SHAs, and there is no install step because
+  the package has no dependencies.
 
 ## [1.5.0] — 2026-11-17
 

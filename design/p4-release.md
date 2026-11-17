@@ -186,11 +186,20 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 
 证据（2026-11-17 22:53）：`node -e` 解析 `package.json` 通过；全套 18 文件 404 条仍全绿。
 
-## 6. 阶段 C：CI（待办）
+## 6. 阶段 C：CI（已落地，2026-11-17 23:1x；首次远端运行待观察）
 
-- [ ] GitHub Actions：`windows-latest` + 与宿主一致的 Node 主版本，跑 `npm test`（18 个文件串联）；
-- [ ] `check` CLI 冒烟：`node tools/check.mjs --tool pwsh --args '{"command":"git reset --hard"}'` 期望退出码 2；
-- [ ] 不建 macOS/Linux job（见 §1 非目标）。
+- [x] GitHub Actions：`windows-latest` + Node 24（宿主自带 24.21.0），跑 `npm test`（18 个文件串联）。
+- [x] `check` CLI 冒烟：`'{"command":"git reset --hard"}' | node tools/check.mjs --policy
+      examples/policy/minimal-v1.json --tool pwsh --args -`，期望退出码 2；断言后用 `$global:LASTEXITCODE = 0`
+      清掉，否则 pwsh 包装层会把 2 当成本步的退出码。
+- [x] 不建 macOS/Linux job（见 §1 非目标）；不装依赖（零依赖、无 lockfile，`npm ci` 会失败）。
+- [x] 两个 action 按 commit SHA 钉死：`actions/checkout@3d3c42e5...`（v7.0.1）、
+      `actions/setup-node@949feb24...`（v7.1.0）。SHA 取自 GitHub API 的 `git/ref/tags/<tag>`（2026-11-17 23:0x），
+      注释里只写主版本号，避免版本号写错。
+
+验证边界：本机没有 YAML 解析器（Python 无 `yaml`，node 运行时不带），所以只做了结构检查
+（`_scratch/check-workflow.mjs`：无 tab、无 BOM、两个 `uses:` 都是 40 位 SHA 且与预期一致、冒烟步骤的
+命令与断言都在）。**YAML 的合法性以 GitHub 的第一次 run 为准**——这也是本次 CI 的第二重意义。
 
 ## 7. 阶段 D：一小时内验收（待办）
 

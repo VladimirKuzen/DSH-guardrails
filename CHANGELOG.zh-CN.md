@@ -24,6 +24,8 @@
   DSH desktop `0.2.2-rc.1`。
 - `dsh-guardrails/` 现在自带 `README.md` 与 `LICENSE`：npm 只收包目录里的文件，之前的 tarball 既没有 npm
   页面要显示的 readme，也没有许可证正文。现在 `pnpm pack` 为 40 个条目，不含 `test/` 与 `design/`。
+- CI：`.github/workflows/test.yml` 在 `windows-latest` + Node 24 上跑全套测试与 `check` 冒烟
+  （`git reset --hard` 必须退出 2）。两个 action 钉 commit SHA；包零依赖，所以没有安装步骤。
 
 ## [1.5.0] — 2026-11-17
 

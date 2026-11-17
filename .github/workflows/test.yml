@@ -1,0 +1,40 @@
+name: test
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    timeout-minutes: 10
+    defaults:
+      run:
+        working-directory: dsh-guardrails
+    steps:
+      # Pinned by commit SHA: a moved tag cannot change what runs here.
+      # actions/checkout v7.0.1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+      # actions/setup-node v7.1.0
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1
+        with:
+          node-version: 24
+
+      # No install step: the package has no dependencies and no lockfile, so
+      # `npm ci` would fail and `npm test` only needs node.
+      - name: run the test suite
+        run: npm test
+
+      # The documented contract is exit 2 for "needs approval". Pin it here so
+      # the CLI and the docs cannot drift apart silently.
+      - name: check CLI reports a deny with exit 2
+        shell: pwsh
+        run: |
+          '{"command":"git reset --hard"}' | node tools/check.mjs --policy examples/policy/minimal-v1.json --tool pwsh --args -
+          if ($LASTEXITCODE -ne 2) { throw "expected exit 2, got $LASTEXITCODE" }
+          $global:LASTEXITCODE = 0
