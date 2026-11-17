@@ -186,7 +186,7 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 
 证据（2026-11-17 22:53）：`node -e` 解析 `package.json` 通过；全套 18 文件 404 条仍全绿。
 
-## 6. 阶段 C：CI（已落地，2026-11-17 23:1x；首次远端运行待观察）
+## 6. 阶段 C：CI（已落地并通过首次远端运行，2026-11-17 23:19）
 
 - [x] GitHub Actions：`windows-latest` + Node 24（宿主自带 24.21.0），跑 `npm test`（18 个文件串联）。
 - [x] `check` CLI 冒烟：`'{"command":"git reset --hard"}' | node tools/check.mjs --policy
@@ -200,6 +200,16 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 验证边界：本机没有 YAML 解析器（Python 无 `yaml`，node 运行时不带），所以只做了结构检查
 （`_scratch/check-workflow.mjs`：无 tab、无 BOM、两个 `uses:` 都是 40 位 SHA 且与预期一致、冒烟步骤的
 命令与断言都在）。**YAML 的合法性以 GitHub 的第一次 run 为准**——这也是本次 CI 的第二重意义。
+
+首次远端运行（2026-11-17 23:19，用户确认）：`test` / `windows` 两个步骤全绿。这一条同时关闭了四件事：
+
+- YAML 是合法的（非法时 GitHub 根本不会创建 run，只在页面上留一条 annotation）；
+- `npm test` 在**真实 npm** 下与我在本机的等价命令同结果（18 个文件、404 条断言），说明差异不在客户端；
+- 冒烟步骤的 `$global:LASTEXITCODE = 0` 写法正确，否则 exit 2 会让步骤红；
+- 两个钉死的 SHA 能被解析，且 `windows-latest` 上的 runner 跑得动 v7 系列 action。
+
+证据来源：本机拿不到该私有仓库的凭据（`SEC_E_NO_CREDENTIALS`），无法自行读取 run 页面；上表结论来自用户
+2026-11-17 23:19 的回报。run 的编号/链接可在 Actions 页面补记。
 
 ## 7. 阶段 D：一小时内验收（待办）
 
@@ -217,6 +227,7 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 | 4 | `git rev-parse "v1.5.0^{commit}" "p3^{commit}"` | 同一提交 | 通过（18:02） |
 | 5 | `node tools/check.mjs --policy examples/policy/minimal-v1.json --tool pwsh --args '{"command":"git reset --hard"}'` | exit 2 | 阶段 D 复跑 |
 | 6 | 公开后：干净 profile 按 README 装一遍 | `loaded.json` 出现 `version` + `surface:"ok"` | 待公开 |
+| 7 | Actions 上的 `test` 首次运行 | 全绿 | 通过（23:19，用户确认） |
 
 ## 9. 风险登记（P4 新增）
 
@@ -229,11 +240,13 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 
 ## 10. 未验证项（不写"应该没问题"）
 
-1. `npm test` 与 `npm ci`：本机没有 `npm`，从未执行。
-2. `npm pack` 的产物内容、`files` 白名单是否漏文件：未执行。
+1. （已关闭，见 §6）`npm test`：由 CI 在 `windows-latest` + 真实 npm 上执行，2026-11-17 23:19 首次运行全绿。
+   `npm ci` 仍不会被执行——零依赖、无 lockfile，也不需要 install。
+2. （已关闭，见 §5）`npm pack` 的产物：用 bundled `pnpm pack` 验过（38 → 40 项，0 泄漏，含 `package/README.md`
+   与 `package/LICENSE`）；`npm pack` 本身未跑，两者同一套 `files` 白名单规则。
 3. `engines.dsh` 的宿主校验行为：在 `0.2.2-rc.1` 上插件正常加载，但没有观察到任何校验动作；宿主是否按
    semver 校验、范围 `>=0.2.0-0` 对预发布版本（`0.2.2-rc.1`）是否成立，均未验证。
-4. GitHub Actions 工作流：尚未编写，自然也未跑过。
+4. （已关闭，见 §6）GitHub Actions 工作流：YAML 被 GitHub 解析器接受，两个步骤跑完。
 5. 仓库可见性切换：未执行（P4 的最后一个动作）。
 6. GitHub Release 页面与 tag 归档：未创建。
 7. "外人一小时装好"：需要一条干净 profile，公开后补做。
