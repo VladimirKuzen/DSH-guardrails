@@ -21,6 +21,10 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   development section now matches reality: 18 files, 404 cases.
 - `design/p4-release.md` records the four decisions, the stages, the history rewrite and the evidence behind
   each claim.
+- Package metadata: `repository` (with `directory: "dsh-guardrails"`, since the package sits in a
+  subdirectory), `homepage` and `bugs` point at the GitHub repository. `private` stays on until the
+  repository becomes public, so nothing is publishable yet. The README now names the host version this was
+  tested on: DSH desktop `0.2.2-rc.1`.
 
 ## [1.5.0] — 2026-11-17
 

@@ -169,12 +169,18 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 `git fetch`/`git ls-remote` 报 `schannel: AcquireCredentialsHandle failed: SEC_E_NO_CREDENTIALS`，凭证只在用户的
 交互会话里可用；远端 refs 数量以用户执行的 `git ls-remote origin` 为准（§10-8）。
 
-## 5. 阶段 B：包元数据（待办，等确认后开工）
+## 5. 阶段 B：包元数据（已完成，2026-11-17 22:5x）
 
-- [ ] `package.json` 补 `repository` / `homepage` / `bugs`（指向 `https://github.com/VladimirKuzen/DSH-guardrails`）；
-- [ ] `"private": true` 保持到公开切换那一刻，切换与填字段分成两条提交；
-- [ ] `engines.dsh` 实机核对宿主版本；核不出就按"仅在 0.2.x 上测过"写进 README（§10 记"未验证"）；
-- [ ] `CHANGELOG` 的 `[Unreleased]` 补一行。
+- [x] `package.json` 补 `repository` / `homepage` / `bugs`，指向 `https://github.com/VladimirKuzen/DSH-guardrails`；
+      `repository.directory` 写 `dsh-guardrails`，因为包在仓库子目录里，不写会让 npm 页面的"代码"链接指到根。
+- [x] `"private": true` 保持原样：可见性切换与摘 `private` 是两件事，留到最后一步单独做。
+- [x] `engines.dsh` 的核对：宿主 desktop 版本是 **`0.2.2-rc.1`**（`~/.dsh/dsh-runtimes/dsh-primary-runtime/runtime.json`
+      的 `desktopVersion` 字段），插件在其上加载为 `version 1.5.0 / surface ok`（`~/.dsh/guardrails/loaded.json`，
+      2026-11-17T14:36:47Z）。**没有观察到宿主校验 `engines.dsh`**，所以 README 按"仅在 0.2.2-rc.1 上测过、
+      其他版本未测"写明，不声称已验证范围语义。
+- [x] 双语 README 的安装一节写明测试过的宿主版本；`CHANGELOG` 的 `[Unreleased]` 补一条。
+
+证据（2026-11-17 22:53）：`node -e` 解析 `package.json` 通过；全套 18 文件 404 条仍全绿。
 
 ## 6. 阶段 C：CI（待办）
 
@@ -212,7 +218,8 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 
 1. `npm test` 与 `npm ci`：本机没有 `npm`，从未执行。
 2. `npm pack` 的产物内容、`files` 白名单是否漏文件：未执行。
-3. `engines.dsh` 的宿主校验行为：未实测。
+3. `engines.dsh` 的宿主校验行为：在 `0.2.2-rc.1` 上插件正常加载，但没有观察到任何校验动作；宿主是否按
+   semver 校验、范围 `>=0.2.0-0` 对预发布版本（`0.2.2-rc.1`）是否成立，均未验证。
 4. GitHub Actions 工作流：尚未编写，自然也未跑过。
 5. 仓库可见性切换：未执行（P4 的最后一个动作）。
 6. GitHub Release 页面与 tag 归档：未创建。

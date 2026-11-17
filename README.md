@@ -95,7 +95,9 @@ shape change shows up instead of looking healthy.
 
 ## Install
 
-Requires DSH on Windows. The package is not on a registry yet; link the checkout into a profile:
+Requires DSH on Windows. Developed and tested against DSH desktop `0.2.2-rc.1` on Windows 11; other host
+versions are untested. The package declares `engines.dsh: ">=0.2.0-0"`, but the host was not observed
+enforcing it. The package is not on a registry yet; link the checkout into a profile:
 
 1. Add the dependency to `%USERPROFILE%\.dsh\profiles\<profile>\package.json`:
 

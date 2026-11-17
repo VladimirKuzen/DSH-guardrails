@@ -4,6 +4,15 @@
   "private": true,
   "description": "Blocks risky DSH tool calls before they run: protects DSH's own home, stops destructive shell commands, and flags secrets in tool arguments. Windows only.",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/VladimirKuzen/DSH-guardrails.git",
+    "directory": "dsh-guardrails"
+  },
+  "homepage": "https://github.com/VladimirKuzen/DSH-guardrails#readme",
+  "bugs": {
+    "url": "https://github.com/VladimirKuzen/DSH-guardrails/issues"
+  },
   "type": "module",
   "engines": {
     "dsh": ">=0.2.0-0"

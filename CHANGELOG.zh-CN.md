@@ -19,6 +19,9 @@
 - `README.md` / `README.zh-CN.md` 不再自称"1.0 之前"，开发一节的测试文件数改为与事实一致：18 个文件、
   404 条。
 - 新增 `design/p4-release.md`：记录四个拍板、分批落地、历史重写，以及每条结论的证据。
+- 包元数据：`repository`（带 `"directory": "dsh-guardrails"`，因为包在子目录里）、`homepage`、`bugs`
+  指向 GitHub 仓库。`private` 保留到仓库公开，所以现在还发布不了。README 写明实际验证过的宿主版本：
+  DSH desktop `0.2.2-rc.1`。
 
 ## [1.5.0] — 2026-11-17
 
