@@ -211,11 +211,23 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 证据来源：本机拿不到该私有仓库的凭据（`SEC_E_NO_CREDENTIALS`），无法自行读取 run 页面；上表结论来自用户
 2026-11-17 23:19 的回报。run 的编号/链接可在 Actions 页面补记。
 
-## 7. 阶段 D：一小时内验收（待办）
+## 7. 阶段 D：一小时内验收（进行中）
 
-按 `design/p4-handoff.md` §7 的七步走一遍。公开前能做的只有"本地等价"版本：安装→`loaded.json`、`check` 模板、
-真实弹卡、三档灰度、`--verify` 链校验、文档升级核查、`CONTRIBUTING` 规则三步。真正的"外人视角"要等仓库公开后
-用一个干净 profile 再走一次。
+按 `design/p4-handoff.md` §7 的七步走一遍。分工（用户决定，2026-11-17 23:27）：
+
+| 步 | 谁 | 在哪 | 状态 |
+|---|---|---|---|
+| 1 安装 → `loaded.json` | 用户 | **一台还没装 DSH 的新机器** | 待做；比本机新建 profile 更接近"外人视角"，且不污染现有 profile |
+| 2 `check` 模板 → exit 2 | 本机 | `examples/policy/minimal-v1.json` | 已实测（2026-11-17 23:0x），阶段 D 复跑记时间 |
+| 3 真实弹卡 | 用户 | 新机器上的 DSH | 待做 |
+| 4 三档灰度 + 2 秒热读 | 用户 | 新机器上的 `policy.json` | 待做 |
+| 5 `--stats --verify` → `chain ok` | 本机 | 现有审计记录 | 待做 |
+| 6 DSH-API 升级核查清单 | 本机 | 纯阅读 | 待做 |
+| 7 `CONTRIBUTING` 加规则三处 | 本机 | 纯阅读（`docs.test.mjs` 保证链接可解析） | 待做 |
+
+步 1 顺带暴露了一个真实缺口并已修：README 第 3 步原来只写 `pnpm install`，而干净机器上 `pnpm` 与 `node`
+都不在 `PATH` 里（本机实测 `Get-Command pnpm,node` 均为空，DSH 自带运行时在 `~/.dsh/dsh-runtimes/` 下）。
+现在中英 README 都给出调用自带 pnpm 的两行命令，并补了"先克隆仓库"这一步——否则外人根本没有 checkout 可 link。
 
 ## 8. 验收矩阵
 
@@ -226,7 +238,7 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 | 3 | `git log --all -S 'My Documents'` | 空 | 通过（18:02） |
 | 4 | `git rev-parse "v1.5.0^{commit}" "p3^{commit}"` | 同一提交 | 通过（18:02） |
 | 5 | `node tools/check.mjs --policy examples/policy/minimal-v1.json --tool pwsh --args '{"command":"git reset --hard"}'` | exit 2 | 阶段 D 复跑 |
-| 6 | 公开后：干净 profile 按 README 装一遍 | `loaded.json` 出现 `version` + `surface:"ok"` | 待公开 |
+| 6 | 干净机器（未装过 DSH）按 README 装一遍 | `loaded.json` 出现 `version` + `surface:"ok"` | 待用户在新机器执行 |
 | 7 | Actions 上的 `test` 首次运行 | 全绿 | 通过（23:19，用户确认） |
 
 ## 9. 风险登记（P4 新增）
