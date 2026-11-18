@@ -41,7 +41,11 @@
   `write` 同一路径那样对 `~/.dsh`、`~/.agents` 求值。过去改写 `~/.dsh/guardrails/policy.json` 的补丁返回
   `allow`，现在会弹卡。这是有意的收紧：v1 策略只会多一次弹卡，不会多出一条静默放行。
 - 自保护也读 `*** Move to:`。此前只扫文件头，所以"只是把文件改名移进插件源码"的补丁看不到。
-- 契约表剩七个 `knownGap`（`gap-apply-patch-delete-dsh` 改为普通用例）；18 个文件共 413 条断言。
+- README 与 `docs/POLICY*.md` 的示例在 Windows 上能直接粘：`check` 的参数走标准输入（`--args -`），
+  因为 PowerShell 会给内联 JSON 重新加引号；策略骨架不再写 `"entries": []`（schema 会拒）。`test/docs.test.mjs`
+  现在会校验 shipped 文档里每一份策略样例，并要求每一处 `check.mjs` 示例都通过 stdin 传参。
+- `README.md` 写明验收用的宿主：开发针对 DSH desktop `0.2.2-rc.1`，干净机器上以 `0.2.2-rc.3` 验收。
+- 契约表剩七个 `knownGap`（`gap-apply-patch-delete-dsh` 改为普通用例）；18 个文件共 416 条断言。
 
 ## [1.5.0] — 2026-11-17
 

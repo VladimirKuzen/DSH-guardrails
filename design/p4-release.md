@@ -10,7 +10,7 @@ P4 只做发布工程：**不动引擎语义、不加规则、不引新依赖、
 ## 0. 现状核对（2026-11-17 18:00，只读）
 
 - 版本 **1.5.0**；`v1.5.0` 与 `p3` 两个附注 tag 都指向 1.5.0 收口的那个提交（历史重写后为 `0c5afd9`）。
-- 测试 **18 个文件 404 条**全绿（1.5.1 起为 413 条，`docs.test` 补两条断言后为 415 条），由 `dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联（本机没有 `npm`，
+- 测试 **18 个文件 404 条**全绿（1.5.1 起为 413 条，`docs.test` 两次补断言后为 416 条），由 `dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联（本机没有 `npm`，
   用 bundled node 逐文件跑，见 §3.3）。
 - 包 `@vlad/dsh-guardrails`，`"private": true`，MIT，`engines.dsh: ">=0.2.0-0"`；没有发布到 npm，也没有 CI。
 - 仓库已有 `LICENSE`、`.gitignore`、`.gitattributes`、双语 `README`/`CHANGELOG`、`docs/` 六份、`examples/policy/` 四份。
@@ -89,7 +89,7 @@ git diff --stat 2251613..HEAD -- dsh-guardrails/lib dsh-guardrails/rules.js dsh-
 
 ### 3.5 证据（2026-11-17 17:4x）
 
-- 全套 **18 文件 404 条 / 0 失败**（1.5.1 之后为 413：contract 73→77、cli 78→82、self-protect 22→23；`docs.test` 加两条后为 415）：audit 11、cli 78、contract 73、critical 15、describe 17、docs 4、dry-run 10、
+- 全套 **18 文件 404 条 / 0 失败**（1.5.1 之后为 413：contract 73→77、cli 78→82、self-protect 22→23；`docs.test` 两次补断言后为 416）：audit 11、cli 78、contract 73、critical 15、describe 17、docs 4、dry-run 10、
   engine-v2 19、examples 4、facts 29、finalize 9、plugin.smoke 38、policy-schema 10、quiet 19、redact 9、replay 3、
   rules 34、self-protect 22。
 - 负对照：把 `i18n/en.json` 的 `action.delete` 改名 → `docs.test.mjs` 报 `pass 3 / fail 1` 并列出缺失 key；改回来恢复 `pass 4`。

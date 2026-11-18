@@ -95,7 +95,8 @@ shape change shows up instead of looking healthy.
 
 ## Install
 
-Requires DSH on Windows. Developed and tested against DSH desktop `0.2.2-rc.1` on Windows 11; other host
+Requires DSH on Windows. Developed against DSH desktop `0.2.2-rc.1` and verified on a clean machine with
+`0.2.2-rc.3`, both on Windows 11; other host
 versions are untested. The package declares `engines.dsh: ">=0.2.0-0"`, but the host was not observed
 enforcing it. The package is not on a registry yet, so link a checkout into a profile:
 
@@ -189,9 +190,13 @@ validated by the test suite.
 ## Ask the gate without asking the host
 
 ```powershell
-node dsh-guardrails/tools/check.mjs --tool pwsh --args '{"command":"Remove-Item D:\\work\\a.txt -Force"}' --json
+'{"command":"Remove-Item D:\\work\\a.txt -Force"}' |
+  node dsh-guardrails/tools/check.mjs --tool pwsh --args - --json
 node dsh-guardrails/tools/check.mjs --policy .\policy.json --validate
 ```
+
+On Windows PowerShell the arguments have to come through stdin (`--args -`): PowerShell re-quotes inline
+arguments, so `--args '{"command":"…"}'` can arrive mangled. `cmd.exe` accepts the inline form.
 
 Exit codes: `0` allow, `2` needs approval, `3` refused, `1` usage or policy error — and `1` never means
 allow. It runs the same `evaluate()` and the same quiet post-step as the host; it writes no audit and

@@ -37,10 +37,12 @@
     "secrets": { "mode": "ask", "patterns": [] },
     "selfProtect": { "mode": "ask", "paths": [] },
     "quiet": { "enabled": false, "roots": [], "paths": ["_scratch"], "alwaysAsk": [".git", ".", ".."] }
-  },
-  "entries": []
+  }
 }
 ```
+
+`entries` 是可选的，这里故意不写：它是"至少一项"的列表，写 `"entries": []` 会被校验拒绝。
+要加就同一条目一起加。
 
 `version` 选引擎：`1`（或不写）是原始语义，`2` 才有排序、`observe`、`allow` 与
 `entries`。`enabled: false` 是把整个护栏关掉，能用更窄的改法就别用它。
@@ -140,8 +142,11 @@
 
 ```
 node tools/check.mjs --policy path/to/policy.json --validate
-node tools/check.mjs --tool pwsh --args '{"command":"Remove-Item D:\\work\\a.txt -Force"}' --json
+'{"command":"Remove-Item D:\\work\\a.txt -Force"}' |
+  node tools/check.mjs --tool pwsh --args - --json
 ```
+
+在 Windows PowerShell 里参数要走标准输入，PowerShell 会给内联参数重新加引号。
 
 第一条回答"文件合法吗"（0 合法、1 不合法）；第二条回答"现在这条命令会被怎么判"，
 用的是宿主同一个 `evaluate()`，不写审计。要复现工作区相关的判定就加 `--cwd`。

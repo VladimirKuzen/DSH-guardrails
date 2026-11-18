@@ -41,10 +41,12 @@ one re-read at runtime.
     "secrets": { "mode": "ask", "patterns": [] },
     "selfProtect": { "mode": "ask", "paths": [] },
     "quiet": { "enabled": false, "roots": [], "paths": ["_scratch"], "alwaysAsk": [".git", ".", ".."] }
-  },
-  "entries": []
+  }
 }
 ```
+
+`entries` is optional and left out here on purpose: it is a list with at least one item, so an empty
+`"entries": []` fails validation. Add the key only together with an entry.
 
 `version` selects the engine. `1` (or absent) is the original semantics; `2`
 adds ranked resolution, `observe`, `allow` and `entries`. `enabled: false` turns
@@ -159,8 +161,11 @@ Copy, then check:
 
 ```
 node tools/check.mjs --policy path/to/policy.json --validate
-node tools/check.mjs --tool pwsh --args '{"command":"Remove-Item D:\\work\\a.txt -Force"}' --json
+'{"command":"Remove-Item D:\\work\\a.txt -Force"}' |
+  node tools/check.mjs --tool pwsh --args - --json
 ```
+
+On Windows PowerShell the arguments have to come through stdin; PowerShell re-quotes inline arguments.
 
 The first answers "is this file valid" (exit 0 valid, 1 not). The second answers
 "what would the gate do right now" without touching the audit — the same

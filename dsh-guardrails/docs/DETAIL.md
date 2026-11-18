@@ -155,7 +155,7 @@ positive — it ranks below every built-in `ask`/`deny`/`observe`.
 `dsh-guardrails check` (or `node tools/check.mjs`) puts one tool call through the same engine the host uses
 and answers with an exit code:
 
-    node tools/check.mjs --tool pwsh --args '{"command":"git reset --hard"}'
+    '{"command":"git reset --hard"}' | node tools/check.mjs --tool pwsh --args -
 
 Exit codes: `0` allowed (including `observe` and the workspace quiet), `2` would be shown for approval, `3`
 refused, `1` usage or policy error — `1` never means "allowed", so a script cannot mistake a typo for a

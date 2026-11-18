@@ -136,7 +136,7 @@
 
 `dsh-guardrails check`（或 `node tools/check.mjs`）把一次工具调用送进宿主用的同一个引擎，用退出码回答：
 
-    node tools/check.mjs --tool pwsh --args '{"command":"git reset --hard"}'
+    '{"command":"git reset --hard"}' | node tools/check.mjs --tool pwsh --args -
 
 退出码：`0` 放行（含 `observe` 与工作区静默放行）、`2` 会弹审批卡、`3` 拒绝、`1` 用法或策略错误——
 `1` 永远不表示"放行"，脚本不会把打错的参数当成许可。加 `--json` 得到

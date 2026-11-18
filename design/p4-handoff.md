@@ -8,7 +8,7 @@ P4 的过程、拍板与验证证据记在 `design/p4-release.md`。
 ## 0. 现状快照（2026-11-17，P3 收口后）
 
 - 插件版本 **1.5.0**；`main` 见 `git log`（P4 开工时的 `82cdcd7` 已在历史重写后换成新哈希）。
-- 测试：18 个文件 **415 条**全过（`dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联）。
+- 测试：18 个文件 **416 条**全过（`dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联）。
 - 文档已就位：`README`/`README.zh-CN`、`CHANGELOG` 双语、`docs/{ARCHITECTURE,DSH-API,POLICY,POLICY.zh,DETAIL,DETAIL.zh}.md`、`examples/policy/` 四份模板（有测试保证可用）。
 - 仓库根已有：`LICENSE`（MIT，`Copyright (c) 2026 Vlad`）、`.gitignore`、`.gitattributes`。
 - 包仍是 `"name": "@vlad/dsh-guardrails"` + `"private": true`，没有发布过，没有 CI。
@@ -99,7 +99,7 @@ P4 的过程、拍板与验证证据记在 `design/p4-release.md`。
 ## 7. 验收：一小时内跑起来（公开前自己走一遍）
 
 1. 新读者从 README 的"安装"走到 `loaded.json` 出现 `version: 1.5.0` / `surface: "ok"`。
-2. 跑 `examples/policy/minimal-v1.json`：`node tools/check.mjs --policy … --tool pwsh --args '{"command":"git reset --hard"}'` → exit 2 且有理由。
+2. 跑 `examples/policy/minimal-v1.json`：`'{"command":"git reset --hard"}' | node tools/check.mjs --policy … --tool pwsh --args -` → exit 2 且有理由。
 3. 在 DSH 里触发一次真实弹卡（写一个文件到受保护目录）。
 4. 用 `POLICY.md` 的三档灰度改一条规则，2 秒后生效。
 5. 用 `tools/audit-report.mjs --stats --verify` 看到 `chain ok`。

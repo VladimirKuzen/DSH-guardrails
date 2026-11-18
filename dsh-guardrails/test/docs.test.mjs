@@ -94,12 +94,18 @@ test('docs: every commandMatches sample is anchored with ^', () => {
   assert.deepEqual(unanchored, []);
 });
 
+/** Shipped docs only: `design/` notes are historical and may quote old, invalid samples. */
+const shipped = (file) => {
+  const rel = file.slice(repo.length + 1).split('\\').join('/');
+  return rel === 'README.md' || rel === 'README.zh-CN.md' || rel.startsWith('dsh-guardrails/docs/');
+};
+
 /** A sample that does not load is a bullet in the README that cannot be copy-pasted. */
-test('docs: every versioned policy sample in the README validates', () => {
+test('docs: every policy sample in the shipped docs validates', () => {
   const broken = [];
   let checked = 0;
-  for (const file of [join(repo, 'README.md'), join(repo, 'README.zh-CN.md')]) {
-    for (const block of readFileSync(file, 'utf8').matchAll(/```json\n([\s\S]*?)```/g)) {
+  for (const file of walk(repo).filter(shipped)) {
+    for (const block of readFileSync(file, 'utf8').matchAll(/```json\r?\n([\s\S]*?)```/g)) {
       const text = block[1].trim();
       // Snippets such as a lone `"pkg": "link:..."` line are fragments, not documents.
       if (!text.startsWith('{')) continue;
@@ -116,6 +122,23 @@ test('docs: every versioned policy sample in the README validates', () => {
       if (!result.ok) broken.push(`${file.slice(repo.length + 1)}: ${describeErrors(result.errors)}`);
     }
   }
-  assert.ok(checked >= 2, `only ${checked} policy samples validated`);
+  assert.ok(checked >= 3, `only ${checked} policy samples validated`);
   assert.deepEqual(broken, []);
+});
+
+/** PowerShell re-quotes inline JSON, so a documented inline `--args` cannot be pasted on Windows. */
+test('docs: every check.mjs sample passes its arguments through stdin', () => {
+  const offending = [];
+  let samples = 0;
+  for (const file of walk(repo).filter(shipped)) {
+    readFileSync(file, 'utf8')
+      .split(/\r?\n/)
+      .forEach((line, index) => {
+        if (!line.includes('check.mjs') || !line.includes('--args')) return;
+        samples += 1;
+        if (!line.includes('--args -')) offending.push(`${file.slice(repo.length + 1)}:${index + 1}`);
+      });
+  }
+  assert.ok(samples >= 4, `only ${samples} check.mjs samples found — the scan broke`);
+  assert.deepEqual(offending, []);
 });

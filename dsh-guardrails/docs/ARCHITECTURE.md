@@ -120,7 +120,7 @@ The order is fixed: R3 → R1 home → R1 self → R2 critical → R2 destructiv
 - `npm test` runs every file under `test/` in order (`node <file>`, not
   `node --test`, because the sandbox forbids the child processes that runner
   spawns).
-- `node tools/check.mjs --tool pwsh --args '{"command":"..."}' --json` answers
+- `'{"command":"..."}' | node tools/check.mjs --tool pwsh --args - --json` answers
   the same question the host would, without touching the audit.
 - A live check still needs a host restart: plugins are evaluated in-process and
   do not hot-reload. `policy.json` is the exception — it is re-read in place.

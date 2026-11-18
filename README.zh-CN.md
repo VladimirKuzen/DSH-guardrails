@@ -85,7 +85,8 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 
 ## 安装
 
-需要 Windows 上的 DSH。开发与验证针对 DSH desktop `0.2.2-rc.1`（Windows 11），其他宿主版本未测；包声明了
+需要 Windows 上的 DSH。开发针对 DSH desktop `0.2.2-rc.1`，并在干净机器上用 `0.2.2-rc.3` 验收（均为
+Windows 11），其他宿主版本未测；包声明了
 `engines.dsh: ">=0.2.0-0"`，但没有观察到宿主校验它。包还没上 registry，先把仓库检出再挂进 profile：
 
 1. 克隆仓库 —— `git clone https://github.com/VladimirKuzen/DSH-guardrails.git`。仓库在发布准备期是私有的，
@@ -173,9 +174,13 @@ shell 命令只有一条语句、只有一个目标、不带 `-Recurse`、不含
 ## 不经过宿主直接问一句
 
 ```powershell
-node dsh-guardrails/tools/check.mjs --tool pwsh --args '{"command":"Remove-Item D:\\work\\a.txt -Force"}' --json
+'{"command":"Remove-Item D:\\work\\a.txt -Force"}' |
+  node dsh-guardrails/tools/check.mjs --tool pwsh --args - --json
 node dsh-guardrails/tools/check.mjs --policy .\policy.json --validate
 ```
+
+在 Windows PowerShell 里参数要走标准输入（`--args -`）：PowerShell 会给内联参数重新加引号，
+`--args '{"command":"…"}'` 可能到不了程序手里。`cmd.exe` 里内联写法可用。
 
 退出码：`0` 放行、`2` 需要审批、`3` 拒绝、`1` 用法或策略错误——`1` 绝不表示放行。它调用与宿主同一个
 `evaluate()` 和同一段 quiet 后处理；不写审计、不刷心跳。

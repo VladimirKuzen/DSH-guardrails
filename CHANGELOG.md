@@ -18,7 +18,7 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   `test/self-protect.test.mjs` derives the workspace from the checkout (the parent of `pluginRoot()`)
   instead of hard-coding it, so the case no longer depends on where the repository lives.
 - `README.md` / `README.zh-CN.md` no longer call the plugin "pre-1.0", and the test-file count in the
-  development section now matches reality: 18 files, 415 cases.
+  development section now matches reality: 18 files, 416 cases.
 - `design/p4-release.md` records the four decisions, the stages, the history rewrite and the evidence behind
   each claim.
 - Package metadata: `repository` (with `directory: "dsh-guardrails"`, since the package sits in a
@@ -51,8 +51,14 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   deliberate tightening: a v1 policy can gain a card, never a silent allow.
 - Self-protection reads `*** Move to:` too. Until now only the file headers were scanned, so a patch that just
   renamed a file into the plugin source was not seen.
+- The README and `docs/POLICY*.md` samples are pasteable on Windows: `check` arguments go through stdin
+  (`--args -`), because PowerShell re-quotes inline JSON, and the policy skeleton no longer shows
+  `"entries": []`, which the schema rejects. `test/docs.test.mjs` now validates every policy sample in the
+  shipped docs and requires every `check.mjs` sample to pass its arguments through stdin.
+- `README.md` names the host it was verified on: developed against DSH desktop `0.2.2-rc.1`, verified on a
+  clean machine with `0.2.2-rc.3`.
 - Seven `knownGap` entries remain in the contract table (`gap-apply-patch-delete-dsh` became an ordinary case);
-  413 assertions across 18 files.
+  416 assertions across 18 files.
 
 ## [1.5.0] — 2026-11-17
 
