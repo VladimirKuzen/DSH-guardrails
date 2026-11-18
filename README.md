@@ -280,3 +280,9 @@ restart DSH. Existing audit files are left in place; delete them yourself if you
 
 MIT.
 
+## Acknowledgements
+
+Built with DeepSeek Harness in an agent-assisted workflow: the agent drafted code, tests and
+documentation under the maintainer's direction. Commit authorship, release decisions and every
+live acceptance run remain with the maintainer.
+
