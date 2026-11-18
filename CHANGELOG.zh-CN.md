@@ -17,11 +17,14 @@
   `D:\work\...`、`%USERPROFILE%\...`、`%LOCALAPPDATA%\...` 占位。`test/self-protect.test.mjs`
   改为从 checkout 推导工作区（`pluginRoot()` 的父目录），不再写死路径，所以这条用例不依赖仓库放在哪。
 - `README.md` / `README.zh-CN.md` 不再自称"1.0 之前"，开发一节的测试文件数改为与事实一致：18 个文件、
-  404 条。
+  416 条。
 - 新增 `design/p4-release.md`：记录四个拍板、分批落地、历史重写，以及每条结论的证据。
 - 包元数据：`repository`（带 `"directory": "dsh-guardrails"`，因为包在子目录里）、`homepage`、`bugs`
   指向 GitHub 仓库。`private` 保留到仓库公开，所以现在还发布不了。README 写明实际验证过的宿主版本：
   DSH desktop `0.2.2-rc.1`。
+- 包名改为 `@vladimirkuzen/dsh-guardrails`。原计划的 scope（`@vlad`）在 npm 上已被占用（用户名与组织均有），
+  所以在首次发布、还没有任何对外版本时改名。`cordis.patch.yml` 随之更新；插件 `id` 仍是 `guardrails`，
+  审计记录与策略文件不受影响。
 - `dsh-guardrails/` 现在自带 `README.md` 与 `LICENSE`：npm 只收包目录里的文件，之前的 tarball 既没有 npm
   页面要显示的 readme，也没有许可证正文。现在 `pnpm pack` 为 40 个条目，不含 `test/` 与 `design/`。
 - CI：`.github/workflows/test.yml` 在 `windows-latest` + Node 24 上跑全套测试与 `check` 冒烟

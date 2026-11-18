@@ -96,19 +96,8 @@ shape change shows up instead of looking healthy.
 ## Install
 
 Requires DSH on Windows. Developed against DSH desktop `0.2.2-rc.1` and verified on a clean machine with
-`0.2.2-rc.3`, both on Windows 11; other host
-versions are untested. The package declares `engines.dsh: ">=0.2.0-0"`, but the host was not observed
-enforcing it. The package is not on a registry yet, so link a checkout into a profile:
-
-1. Clone the repository — `git clone https://github.com/VladimirKuzen/DSH-guardrails.git`. It is private while
-   it is being prepared for release, so this step needs access to it.
-2. Add the dependency to `%USERPROFILE%\.dsh\profiles\<profile>\package.json`:
-
-   ```json
-   "@vlad/dsh-guardrails": "link:<absolute path to the checkout>\\dsh-guardrails"
-   ```
-
-3. Add `@vlad/dsh-guardrails` to `dsh.profile.bundles` in the same file.
+`0.2.2-rc.3`, both on Windows 11; other host versions are untested. The package declares
+`engines.dsh: ">=0.2.0-0"`, but the host was not observed enforcing it.
 
 > **The runtime is lazy.** DSH unpacks its bundled `node` and `pnpm` on first need, not on first launch: a
 > fresh install does not create `%USERPROFILE%\.dsh\dsh-runtimes\` just by being started. Use the host once
@@ -118,6 +107,25 @@ enforcing it. The package is not on a registry yet, so link a checkout into a pr
 > `%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\`, or install Node LTS plus `pnpm` yourself and use
 > those instead of the bundled ones.
 
+**From npm** — the package is published as `@vladimirkuzen/dsh-guardrails`:
+
+```powershell
+dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails
+```
+
+`dsh plugin` forwards to `pnpm` in the profile directory and enables the bundle for you, so there is no JSON
+to edit; use `--profile web` for the web profile. Then restart DSH.
+
+**From a checkout** — for unreleased changes:
+
+1. `git clone https://github.com/VladimirKuzen/DSH-guardrails.git`
+2. Add the dependency to `%USERPROFILE%\.dsh\profiles\<profile>\package.json`:
+
+   ```json
+   "@vladimirkuzen/dsh-guardrails": "link:<absolute path to the checkout>\\dsh-guardrails"
+   ```
+
+3. Add `@vladimirkuzen/dsh-guardrails` to `dsh.profile.bundles` in the same file.
 4. Run `pnpm install` in the profile directory. A clean machine has no `pnpm` (or `node`) on `PATH` — DSH
    brings its own runtime — so call that copy:
 
@@ -273,7 +281,7 @@ Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the chil
 
 ## Uninstall
 
-Remove `@vlad/dsh-guardrails` from the profile's `dsh.profile.bundles` and its `dependencies`, then
+Remove `@vladimirkuzen/dsh-guardrails` from the profile's `dsh.profile.bundles` and its `dependencies`, then
 restart DSH. Existing audit files are left in place; delete them yourself if you want them gone.
 
 ## License

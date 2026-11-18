@@ -12,7 +12,7 @@ P4 只做发布工程：**不动引擎语义、不加规则、不引新依赖、
 - 版本 **1.5.0**；`v1.5.0` 与 `p3` 两个附注 tag 都指向 1.5.0 收口的那个提交（历史重写后为 `0c5afd9`）。
 - 测试 **18 个文件 404 条**全绿（1.5.1 起为 413 条，`docs.test` 两次补断言后为 416 条），由 `dsh-guardrails/package.json` 的 `scripts.test` 逐文件串联（本机没有 `npm`，
   用 bundled node 逐文件跑，见 §3.3）。
-- 包 `@vlad/dsh-guardrails`，`"private": true`，MIT，`engines.dsh: ">=0.2.0-0"`；没有发布到 npm，也没有 CI。
+- 包 `@vlad/dsh-guardrails`，`"private": true`，MIT，`engines.dsh: ">=0.2.0-0"`；没有发布到 npm，也没有 CI（2026-11-18 修订：`@vlad` 这个 scope 在 npm 上被占，发布名改为 `@vladimirkuzen/dsh-guardrails`，见 §2 的修订段）。
 - 仓库已有 `LICENSE`、`.gitignore`、`.gitattributes`、双语 `README`/`CHANGELOG`、`docs/` 六份、`examples/policy/` 四份。
 
 ### 0.1 开工单与事实的三处偏差（已修）
@@ -39,13 +39,18 @@ git diff --stat 2251613..HEAD -- dsh-guardrails/lib dsh-guardrails/rules.js dsh-
 | # | 问题 | 决定 | 理由 | 后果 |
 |---|---|---|---|---|
 | 1 | 版权署名 | 保持 `Copyright (c) 2026 Vlad` | 维持现状 | `LICENSE` 不动 |
-| 2 | 包名与 scope | 保留 `@vlad/dsh-guardrails` | 无 scope 的 `dsh-guardrails` 已被 npm 占用 | 不改 `name`；npm 发布不在 P4 范围 |
+| 2 | 包名与 scope | 保留 `@vlad/dsh-guardrails`（2026-11-18 改为 `@vladimirkuzen/dsh-guardrails`，见下） | 无 scope 的 `dsh-guardrails` 已被 npm 占用；`@vlad` 后来发现也被占 | 不改 `name`；npm 发布不在 P4 范围 |
 | 3 | 仓库可见性 | **先私有**，P4 过程中逐项验证后再转公开 | "现在还不能完全验证的状态"；私有→公开的过渡本身就是 P4 的设计内容 | `"private": true` 暂留；公开切换是 P4 的最后一个动作 |
 | 4 | `design/` 是否公开 | 公开，本机路径改成通用占位 | 决策与踩坑记录是项目最有价值的部分之一 | 需要历史重写（§4） |
 | 5 | `scripts/` 是否公开 | 不公开 | 个人运维脚本，依赖本机布局 | 继续留在 `.gitignore`，`files` 白名单不含它 |
 
 第 2 与第 3 条合起来有一个直接后果：**P4 不做 `npm publish`**。`private: true` 会让 `npm publish` 直接失败，
 这是有意的——包名先留着，等公开切换时再一并决定是否发布。
+
+**2026-11-18 修订**：第 2 条的 scope 不再成立——npm 上 `vlad` 的用户名与同名组织都已被占用，`@vlad/*` 无法发布；
+发布名改为 `@vladimirkuzen/dsh-guardrails`。第 3 条的后果也随之变化：仓库已经转公开，`private` 在首次发布前
+摘掉，发布本身从"范围外"变成 P4 的收尾动作。原判断保留，因为"当时查过、看起来可用、后来发现 scope 必须是
+同名账号"正是发布工程要记录的那类偏差。
 
 ## 3. 阶段 A：不依赖拍板的工作（已完成）
 

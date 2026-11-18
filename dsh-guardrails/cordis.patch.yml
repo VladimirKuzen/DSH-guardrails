@@ -7,5 +7,5 @@
 # 下一次工具调用就会读到（2 秒缓存）。
 - insert:
     - id: guardrails
-      name: '@vlad/dsh-guardrails'
+      name: '@vladimirkuzen/dsh-guardrails'
       config: {}

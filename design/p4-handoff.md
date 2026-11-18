@@ -33,6 +33,8 @@ P4 的过程、拍板与验证证据记在 `design/p4-release.md`。
 
 **拍板结果（2026-11-17）**：(1) 保持现状，`Copyright (c) 2026 Vlad`。(2) 保留 `@vlad/dsh-guardrails`——无 scope 的 `dsh-guardrails` 已被占用；仓库先维持私有，随 P4 逐项验证再转公开，私有→公开的过程本身就是 P4 的设计内容。(3) `design/` 公开，路径改成通用占位。(4) `scripts/` 不公开。
 
+**2026-11-18 修订（仅第 2 条）**：npm 上 `vlad` 这个用户名与同名组织都已被占用，`@vlad/*` 发不出去，所以发布名改为 `@vladimirkuzen/dsh-guardrails`（维护者的 npm 用户名）。其余三条不变；原判断保留在这里，是因为"查过、当时可用、后来发现 scope 要同名账号"这个过程本身是发布工程的一部分。
+
 ## 3. 工作分解
 
 ### 3.1 仓库整理
@@ -55,7 +57,7 @@ P4 的过程、拍板与验证证据记在 `design/p4-release.md`。
 
 ### 3.3 包元数据
 
-- [x] 包名与 scope 已拍板：保留 `@vlad/dsh-guardrails`（`dsh-guardrails` 在 npm 上已被占用）
+- [x] 包名与 scope 已拍板，并经 2026-11-18 修订：`@vlad` 在 npm 上被占（用户名与组织），发布名定为 `@vladimirkuzen/dsh-guardrails`
 - [ ] 公开时去掉 `"private": true`（与仓库可见性切换同一批动作，`design/p4-release.md` §9 有拆开改的理由）
 - [x] `license`、`files` 白名单、`bin`、`exports`、`engines.dsh`（`repository` 见下一行）
 - [x] `repository` / `homepage` / `bugs` 三个字段（`e9fb04c`）

@@ -86,18 +86,7 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
 ## 安装
 
 需要 Windows 上的 DSH。开发针对 DSH desktop `0.2.2-rc.1`，并在干净机器上用 `0.2.2-rc.3` 验收（均为
-Windows 11），其他宿主版本未测；包声明了
-`engines.dsh: ">=0.2.0-0"`，但没有观察到宿主校验它。包还没上 registry，先把仓库检出再挂进 profile：
-
-1. 克隆仓库 —— `git clone https://github.com/VladimirKuzen/DSH-guardrails.git`。仓库在发布准备期是私有的，
-   这一步需要你有访问权。
-2. 在 `%USERPROFILE%\.dsh\profiles\<profile>\package.json` 的依赖里加：
-
-   ```json
-   "@vlad/dsh-guardrails": "link:<检出目录的绝对路径>\\dsh-guardrails"
-   ```
-
-3. 在同一个文件的 `dsh.profile.bundles` 里加上 `@vlad/dsh-guardrails`。
+Windows 11），其他宿主版本未测；包声明了 `engines.dsh: ">=0.2.0-0"`，但没有观察到宿主校验它。
 
 > **运行时是懒加载的。** DSH 自带的 `node` 与 `pnpm` 在第一次**真正需要**时才解压，不是第一次启动就解压：
 > 全新安装后只启动一次，`%USERPROFILE%\.dsh\dsh-runtimes\` 不会出现。先用一次会调外部命令的工具，或者让
@@ -105,6 +94,25 @@ Windows 11），其他宿主版本未测；包声明了
 > `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\primary-runtime\`：把它拷到
 > `%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\`；或者自己装 Node LTS 和 `pnpm`，用 PATH 上的那两份。
 
+**从 npm 安装** —— 包已发布为 `@vladimirkuzen/dsh-guardrails`：
+
+```powershell
+dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails
+```
+
+`dsh plugin` 会把它转给 profile 目录里的 `pnpm`，并自动启用该 bundle，不需要手改 JSON；web 档位用
+`--profile web`。之后重启 DSH。
+
+**从仓库检出安装** —— 想跑未发布的改动时：
+
+1. `git clone https://github.com/VladimirKuzen/DSH-guardrails.git`
+2. 在 `%USERPROFILE%\.dsh\profiles\<profile>\package.json` 的依赖里加：
+
+   ```json
+   "@vladimirkuzen/dsh-guardrails": "link:<检出目录的绝对路径>\\dsh-guardrails"
+   ```
+
+3. 在同一个文件的 `dsh.profile.bundles` 里加上 `@vladimirkuzen/dsh-guardrails`。
 4. 在 profile 目录执行 `pnpm install`。干净机器上 `pnpm`（和 `node`）都不在 `PATH` 里——DSH 自带运行时——
    所以用自带的那份：
 
@@ -250,7 +258,7 @@ npm test   # 依次跑十八个测试文件
 
 ## 卸载
 
-从 profile 的 `dsh.profile.bundles` 和 `dependencies` 里删掉 `@vlad/dsh-guardrails`，重启 DSH。
+从 profile 的 `dsh.profile.bundles` 和 `dependencies` 里删掉 `@vladimirkuzen/dsh-guardrails`，重启 DSH。
 已有审计文件不会自动删除；需要的话自行清理。
 
 ## 许可证

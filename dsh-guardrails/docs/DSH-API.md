@@ -23,7 +23,7 @@ Tested against DSH as installed on 2026-11-17 (`engines.dsh: >=0.2.0-0`).
 | `exec.callId` | `index.js` | Stable per call, shared by all its records | Audit cannot be joined; pending map leaks |
 | `exec.agent.session.header.cwd` | `index.js` | The session workspace lives in the session header | `cwdUnder` entries silently never match (mitigated: one `config-invalid` record, see below) |
 | `ctx.logger.info/warn/error` | `index.js` | Optional; the plugin uses `?.` everywhere | Warnings vanish; the gate keeps working |
-| Profile link + bundle patch | `package.json`, `cordis.patch.yml` | `@vlad/dsh-guardrails: link:<repo>/dsh-guardrails` in the profile, listed in `dsh.profile.bundles` | Plugin never mounts; `loaded.json` goes stale (freshness is the signal) |
+| Profile link + bundle patch | `package.json`, `cordis.patch.yml` | `@vladimirkuzen/dsh-guardrails: link:<repo>/dsh-guardrails` in the profile, listed in `dsh.profile.bundles` | Plugin never mounts; `loaded.json` goes stale (freshness is the signal) |
 | `engines.dsh` | `package.json` | Not enforced by the host today; documents the tested range | No effect — this is a note, not a check |
 
 ## What the plugin checks by itself

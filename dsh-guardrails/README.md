@@ -12,6 +12,15 @@ The full documentation lives in the repository: <https://github.com/VladimirKuze
 - File map and the eight steps of one call: `docs/ARCHITECTURE.md`
 - Host interfaces this depends on, and what breaks when one moves: `docs/DSH-API.md`
 
-Install, configure, audit and uninstall: see the repository README.
+Install into a DSH profile:
+
+```powershell
+dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails
+```
+
+`dsh plugin` forwards to `pnpm` in the profile directory and enables the bundle; restart DSH afterwards and
+check that `~/.dsh/guardrails/loaded.json` reports a matching `version` and `surface: "ok"`. Installing from a
+checkout, configuring a policy, reading the audit trail and uninstalling are covered in the repository
+README: <https://github.com/VladimirKuzen/DSH-guardrails#install>.
 
 Licensed under the MIT license; the text is in [LICENSE](LICENSE).
