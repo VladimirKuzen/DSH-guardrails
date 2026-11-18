@@ -94,7 +94,7 @@
   "id": "no-force-push",
   "tool": ["pwsh", "bash"],
   "mode": "deny",
-  "when": { "commandMatches": "\\bgit\\s+push\\b[^|;]*--force" }
+  "when": { "commandMatches": "^\\s*git\\s+push\\b[^|;]*--force" }
 }
 ```
 
@@ -102,7 +102,9 @@
 - `mode` 可以是 `deny`、`ask`、`observe`、`allow`。
 - `when` 至少给一个条件：`cwdUnder`、`targetUnder`、`commandMatches`，三者是"与"。
   路径条件写绝对路径（可用 `~` / `%VAR%`）。
-- `commandMatches` 必须 `^` 开头，只作用于 shell 命令。
+- `commandMatches` 必须 `^` 开头，只作用于 shell 命令。正则看到的是**整条命令文本**，所以
+  `^\s*git\s+push` 不匹配 `cd repo; git push --force`——要命中命令中段，得自己在锚点后放宽
+  （例如 `^[\s\S]*`），代价是这条规则不再限制"命令从哪开始"。
 - `allow` 条目必须带收窄条件，而且**永远赢不了内置的 `ask`/`deny`**——它的作用是
   把意图写进审计，不是开豁免。
 

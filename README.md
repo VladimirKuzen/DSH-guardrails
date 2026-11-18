@@ -159,7 +159,7 @@ replaced while the gate keeps working in a new one. Freshness plus version (plus
   },
   "entries": [
     { "id": "no-force-push", "tool": ["pwsh", "bash"], "mode": "deny",
-      "when": { "commandMatches": "\\bgit\\s+push\\b[^|;]*--force" } }
+      "when": { "commandMatches": "^\\s*git\\s+push\\b[^|;]*--force" } }
   ]
 }
 ```

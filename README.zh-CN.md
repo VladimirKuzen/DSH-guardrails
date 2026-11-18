@@ -146,7 +146,7 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
   },
   "entries": [
     { "id": "no-force-push", "tool": ["pwsh", "bash"], "mode": "deny",
-      "when": { "commandMatches": "\\bgit\\s+push\\b[^|;]*--force" } }
+      "when": { "commandMatches": "^\\s*git\\s+push\\b[^|;]*--force" } }
   ]
 }
 ```

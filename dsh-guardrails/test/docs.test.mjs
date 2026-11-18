@@ -4,6 +4,8 @@ import { existsSync, readFileSync, readdirSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { describeErrors, validatePolicy } from '../lib/policy/validate.js';
+
 const here = dirname(fileURLToPath(import.meta.url));
 const plugin = resolve(here, '..');
 const repo = resolve(here, '..', '..');
@@ -73,5 +75,47 @@ test('docs: every relative link in the Markdown tree resolves', () => {
   }
   // A walker that silently matches nothing would pass; the tree always carries this many links.
   assert.ok(links >= 25, `only ${links} links scanned — the walker or the link pattern broke`);
+  assert.deepEqual(broken, []);
+});
+
+/** The validator refuses an unanchored `commandMatches`; a copy-pasted sample would fail on load. */
+const COMMAND_MATCH = /"commandMatches"\s*:\s*"((?:[^"\\]|\\.)*)"/g;
+
+test('docs: every commandMatches sample is anchored with ^', () => {
+  let samples = 0;
+  const unanchored = [];
+  for (const file of walk(repo)) {
+    for (const match of readFileSync(file, 'utf8').matchAll(COMMAND_MATCH)) {
+      samples += 1;
+      if (!match[1].startsWith('^')) unanchored.push(`${file.slice(repo.length + 1)}: ${match[1]}`);
+    }
+  }
+  assert.ok(samples >= 4, `only ${samples} commandMatches samples found — the scan broke`);
+  assert.deepEqual(unanchored, []);
+});
+
+/** A sample that does not load is a bullet in the README that cannot be copy-pasted. */
+test('docs: every versioned policy sample in the README validates', () => {
+  const broken = [];
+  let checked = 0;
+  for (const file of [join(repo, 'README.md'), join(repo, 'README.zh-CN.md')]) {
+    for (const block of readFileSync(file, 'utf8').matchAll(/```json\n([\s\S]*?)```/g)) {
+      const text = block[1].trim();
+      // Snippets such as a lone `"pkg": "link:..."` line are fragments, not documents.
+      if (!text.startsWith('{')) continue;
+      let policy;
+      try {
+        policy = JSON.parse(text);
+      } catch (error) {
+        broken.push(`${file.slice(repo.length + 1)}: ${error.message}`);
+        continue;
+      }
+      if (policy === null || typeof policy !== 'object' || policy.version === undefined) continue;
+      checked += 1;
+      const result = validatePolicy(policy);
+      if (!result.ok) broken.push(`${file.slice(repo.length + 1)}: ${describeErrors(result.errors)}`);
+    }
+  }
+  assert.ok(checked >= 2, `only ${checked} policy samples validated`);
   assert.deepEqual(broken, []);
 });

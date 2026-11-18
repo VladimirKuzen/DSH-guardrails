@@ -109,7 +109,7 @@ too broad; one approved rarely is usually doing its job.
   "id": "no-force-push",
   "tool": ["pwsh", "bash"],
   "mode": "deny",
-  "when": { "commandMatches": "\\bgit\\s+push\\b[^|;]*--force" }
+  "when": { "commandMatches": "^\\s*git\\s+push\\b[^|;]*--force" }
 }
 ```
 
@@ -118,7 +118,10 @@ too broad; one approved rarely is usually doing its job.
 - `when` needs at least one of `cwdUnder`, `targetUnder`, `commandMatches`; the
   three are ANDed. Path conditions take absolute paths (or `~` / `%VAR%`).
 - `commandMatches` is a regular expression that must start with `^`; it is
-  applied to shell commands only.
+  applied to shell commands only. The pattern sees the **whole command text**, so
+  `^\s*git\s+push` does not match `cd repo; git push --force` — to catch a
+  command in the middle, relax it after the anchor (for example `^[\s\S]*`) and
+  accept that the rule no longer pins where the command starts.
 - `allow` entries require a narrowing condition, and they never beat a built-in
   `ask`/`deny` — they exist to be explicit and visible in the audit, not to
   grant exemptions.

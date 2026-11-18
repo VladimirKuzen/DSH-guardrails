@@ -18,7 +18,7 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   `test/self-protect.test.mjs` derives the workspace from the checkout (the parent of `pluginRoot()`)
   instead of hard-coding it, so the case no longer depends on where the repository lives.
 - `README.md` / `README.zh-CN.md` no longer call the plugin "pre-1.0", and the test-file count in the
-  development section now matches reality: 18 files, 413 cases.
+  development section now matches reality: 18 files, 415 cases.
 - `design/p4-release.md` records the four decisions, the stages, the history rewrite and the evidence behind
   each claim.
 - Package metadata: `repository` (with `directory: "dsh-guardrails"`, since the package sits in a
@@ -35,7 +35,13 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   the bundled Node used locally.
 - The install section is followable on a clean machine: it starts with `git clone`, and the `pnpm install` step
   calls the pnpm that DSH ships (`~/.dsh/dsh-runtimes/*/dependencies/pnpm`), because neither `pnpm` nor `node` is
-  on `PATH` after a plain Windows install.
+  on `PATH` after a plain Windows install. The same section now says the runtime is unpacked lazily, and what to
+  copy when it never appears.
+- Every `entries` sample in `README.md`, `README.zh-CN.md`, `docs/POLICY.md` and `docs/POLICY.zh.md` used a
+  `commandMatches` regex without the leading `^` the validator requires, so pasting it produced
+  `config-invalid` and the entry never fired. The samples are anchored, `docs/POLICY*.md` explains that the
+  pattern sees the whole command text, and `test/docs.test.mjs` now checks both the anchoring of every sample
+  and that the versioned policy block in each README passes `validatePolicy`.
 
 ## [1.5.1] — 2026-11-18
 

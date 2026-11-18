@@ -28,7 +28,12 @@
   （`git reset --hard` 必须退出 2）。两个 action 钉 commit SHA；包零依赖，所以没有安装步骤。
 - 首次 CI 运行全绿（2026-11-17），顺带说明 `npm test` 在真实 npm 下的结果与本机自带 Node 跑出来一致。
 - 安装一节现在能在干净机器上照做：以 `git clone` 开头，`pnpm install` 一步改为调用 DSH 自带的 pnpm
-  （`~/.dsh/dsh-runtimes/*/dependencies/pnpm`）——裸装 Windows 上 `pnpm` 与 `node` 都不在 `PATH` 里。
+  （`~/.dsh/dsh-runtimes/*/dependencies/pnpm`）——裸装 Windows 上 `pnpm` 与 `node` 都不在 `PATH` 里。同一节
+  现在也写明运行时是懒解压的，以及一直不出现时该拷哪份载荷。
+- `README.md`、`README.zh-CN.md`、`docs/POLICY.md`、`docs/POLICY.zh.md` 里的 `entries` 示例都少了校验器要求的
+  开头 `^`，照抄会得到 `config-invalid`、条目从不生效。示例已锚定，`docs/POLICY*.md` 增补"正则看到的是整条
+  命令文本"，`test/docs.test.mjs` 现在既检查每个示例的锚定，也检查两份 README 里带 `version` 的策略块能通过
+  `validatePolicy`。
 
 ## [1.5.1] — 2026-11-18
 
