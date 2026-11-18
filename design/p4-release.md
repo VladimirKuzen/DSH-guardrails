@@ -269,6 +269,7 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 | 5 | `node tools/check.mjs --policy examples/policy/minimal-v1.json --tool pwsh --args -` + stdin `{"command":"git reset --hard"}` | exit 2 | 通过（2026-11-18：`review  R2 ask`，exit 2） |
 | 6 | 干净机器（未装过 DSH）按 README 装一遍 | `loaded.json` 出现 `version` + `surface:"ok"` | 通过（2026-11-18，见 §7.1） |
 | 7 | Actions 上的 `test` 首次运行 | 全绿 | 通过（23:19，用户确认） |
+| 8 | `npm view @vladimirkuzen/dsh-guardrails versions dist-tags` | `1.5.1` 在 `versions` 里，`latest` 指向它 | 通过（2026-11-18 19:44，见 §12） |
 
 ## 9. 风险登记（P4 新增）
 
@@ -290,7 +291,9 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
    `runtime.json` 已是 `desktopVersion 0.2.2-rc.3`（exe `ProductVersion 0.2.2.0`），README 仍写"测于
    `0.2.2-rc.1`"——措辞待定（写实际测过的 rc.1，还是跟着宿主升级改写，需要一次实测后再定）。
 4. （已关闭，见 §6）GitHub Actions 工作流：YAML 被 GitHub 解析器接受，两个步骤跑完。
-5. 仓库可见性切换：未执行（P4 的最后一个动作）。
+5. （已关闭，2026-11-18）仓库可见性切换：已转公开（匿名 API 读到 `private=false`、`visibility=public`），
+   分支保护 ruleset 已启用并要求 `windows` 这个 status check。三项 GitHub 设置里，私有漏洞报告与 Dependabot
+   只在公开后可用，现在都已可用。
 6. GitHub Release 页面与 tag 归档：未创建。
 7. （已关闭，见 §7.1）"外人一小时装好"：用户在一台未装过 DSH 的机器上按 README 装完并跑完 4+1 项验收；
    实际耗时超过一小时，差额来自三处文档缺陷（缺"先克隆"、`pnpm` 不在 `PATH`、`entries` 示例没锚定），
@@ -302,5 +305,39 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 
 - `design/p4-handoff.md` §0 的提交哈希改成"见 `git log`"（重写后旧哈希不存在），§2 记拍板结果，§3 勾选；
 - `README.md` / `README.zh-CN.md` 的文档地图与结构表指向 `SECURITY.md`、`CONTRIBUTING.md`；
-- `CHANGELOG.md` / `CHANGELOG.zh-CN.md` 的 `[Unreleased]` 随每条实质改动追加；
+- `CHANGELOG.md` / `CHANGELOG.zh-CN.md` 的 `[Unreleased]` 段落已并入 `[1.5.1]`（发布后不再有"未发布"的东西）；
 - `design/p3-handoff.md` 是 P3 收口快照：只把路径换成占位，**不改**它的测试数（历史记录，不是现状）。
+
+## 12. npm 发布（2026-11-18 19:41，用户执行）
+
+包名最终是 `@vladimirkuzen/dsh-guardrails@1.5.1`——原计划的 `@vlad` 在 npm 上用户名与组织都已被占用（§2 修订段）。
+
+### 12.1 发布时踩的两个坑
+
+1. **pnpm 的登录态压过 `.npmrc` 的 token**。`pnpm login` 会把凭据存进它自己的配置，优先级高于 `~/.npmrc`
+   里手写的 `_authToken`；于是即使换了带 bypass 2FA 的 granular token，`PUT` 仍然返回
+   `Two-factor authentication or granular access token with bypass 2fa enabled is required`。
+   解法是 `pnpm logout`，只留 `.npmrc` 那一行 token。
+2. **npm 不再允许新开 TOTP（验证器 App）2FA**，只剩 WebAuthn 安全密钥，而 CLI 的 `--otp` 只认 6 位码。
+   所以发布走的是"granular token + Bypass two-factor authentication"。npm 已公告 **2027-01 起直接发布也
+   不再接受 bypass token**，届时要么回到 OTP，要么用 Trusted Publishing（GitHub Actions 的 OIDC）。
+
+### 12.2 证据（2026-11-18 19:44–19:50，匿名请求 registry）
+
+- `GET /@vladimirkuzen%2Fdsh-guardrails`：`versions = ["0.0.0-stage","1.5.1"]`，`dist-tags.latest = "1.5.1"`，
+  `license = MIT`，`dependencies = {}`，`dsh.bundle.patch = "./cordis.patch.yml"`，`time["1.5.1"] =
+  2026-11-18T11:41:44Z`，`shasum = 887d7ea64f0b8d01c135b3e43297eee5d49c5b8b`。
+- tarball `HEAD` 在发布后约 6 分钟内一直是 404（CDN 复制延迟），随后 200；下载后 `tar -tzf` 为 **40 条**，
+  含 `package/README.md`、`package/LICENSE`、`docs/`、`examples/`、`tools/`、`i18n/`、`locale/`、`icon.svg`，
+  不含 `test/` 与 `design/`；`package/package.json` 里 `name`/`version` 与 registry 一致。
+- 端到端：`npm install @vladimirkuzen/dsh-guardrails@1.5.1 --prefix <临时目录>` → `added 1 package in 2s`，
+  目录里是上面那 14 个顶层条目。
+
+### 12.3 副作用与收尾
+
+- 首次发布时 npm 先落了一个占位版本 `0.0.0-stage`（`Temporary package placeholder for staged publishing`）。
+  它不会被自动删除，但 `latest` 已指向 `1.5.1`，只有显式指定 `@0.0.0-stage` 才会装到它；如需处理，
+  `npm deprecate "@vladimirkuzen/dsh-guardrails@0.0.0-stage" "placeholder"`（需要 2FA）。
+- 发布者身份是 `vladimirkuzen <ryhdllg@gmail.com>`（registry 的 `maintainers` 字段）。
+- `v1.5.1` 这个 tag 仍指向发布前的提交；本文件的 §12 落进某个提交后，tag 需要移到那个提交上（用户执行
+  `git tag -f` + `git push -f origin v1.5.1`）。

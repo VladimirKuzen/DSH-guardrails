@@ -4,8 +4,11 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
-## [未发布]
+## [1.5.1] — 2026-11-18
 
+- 已发布到 npm：`@vladimirkuzen/dsh-guardrails@1.5.1`（MIT，零运行时依赖）。tarball 含 `README.md`、
+  `LICENSE`、`docs/`、`examples/`、`tools/`、`i18n/`、`locale/`、`icon.svg`、`cordis.patch.yml` 共 40 条，
+  不含 `test/` 与 `design/`。
 - 发布配套文档：[SECURITY.md](SECURITY.md) 写明支持哪些版本（`1.x`；仅 Windows，"跨平台不工作"不算漏洞）、
   什么算绕过、什么是已记录的边界，以及漏洞走 GitHub 私密报告而不是公开 issue。
   [CONTRIBUTING.md](CONTRIBUTING.md) 写了改代码的底线、文件地图、加一条规则的六步、
@@ -37,9 +40,6 @@
   开头 `^`，照抄会得到 `config-invalid`、条目从不生效。示例已锚定，`docs/POLICY*.md` 增补"正则看到的是整条
   命令文本"，`test/docs.test.mjs` 现在既检查每个示例的锚定，也检查两份 README 里带 `version` 的策略块能通过
   `validatePolicy`。
-
-## [1.5.1] — 2026-11-18
-
 - R1 现在会读 `apply_patch` 文本里的目标——`*** Add|Update|Delete File:` 头与 `*** Move to:` 目的地——并像
   `write` 同一路径那样对 `~/.dsh`、`~/.agents` 求值。过去改写 `~/.dsh/guardrails/policy.json` 的补丁返回
   `allow`，现在会弹卡。这是有意的收紧：v1 策略只会多一次弹卡，不会多出一条静默放行。

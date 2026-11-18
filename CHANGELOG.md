@@ -4,8 +4,11 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
-## [Unreleased]
+## [1.5.1] — 2026-11-18
 
+- Published to npm as `@vladimirkuzen/dsh-guardrails@1.5.1` (MIT, no runtime dependencies). The tarball
+  carries `README.md`, `LICENSE`, `docs/`, `examples/`, `tools/`, `i18n/`, `locale/`, `icon.svg` and
+  `cordis.patch.yml` — 40 entries, no `test/` or `design/`.
 - Release paperwork: [SECURITY.md](SECURITY.md) states supported versions (`1.x`; Windows-only out of
   scope), what counts as a bypass, what is a documented limit, and that reports go through GitHub's
   private advisory instead of a public issue. [CONTRIBUTING.md](CONTRIBUTING.md) has the ground rules,
@@ -46,9 +49,6 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   `config-invalid` and the entry never fired. The samples are anchored, `docs/POLICY*.md` explains that the
   pattern sees the whole command text, and `test/docs.test.mjs` now checks both the anchoring of every sample
   and that the versioned policy block in each README passes `validatePolicy`.
-
-## [1.5.1] — 2026-11-18
-
 - R1 reads the targets carried inside `apply_patch` text — the `*** Add|Update|Delete File:` header and the
   `*** Move to:` destination — and checks them against `~/.dsh` and `~/.agents` exactly like a `write` to that
   path. A patch that rewrote `~/.dsh/guardrails/policy.json` used to return `allow`; it now asks. This is a
