@@ -4,6 +4,15 @@
 
 Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/package.json`.
 
+## [Unreleased]
+
+- Install is now documented as **Plugins → Add plugin → paste the package name**, which is how a clean machine
+  was verified on 2026-11-18: no shell, no `PATH` problem, and the same dialog also accepts a Git address or a
+  local directory. The CLI (`dsh plugin …`) stays as the alternative, with a note that the desktop installer
+  does not put `dsh` on `PATH` and that the copy under `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\
+  runtime\cli\bin\dsh.cmd` may need the runtime unpacked first (untested). Uninstall gained the matching
+  "remove it from the Plugins page" path.
+
 ## [1.5.1] — 2026-11-18
 
 - Published to npm as `@vladimirkuzen/dsh-guardrails@1.5.1` (MIT, no runtime dependencies). The tarball

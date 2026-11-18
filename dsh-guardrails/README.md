@@ -12,7 +12,8 @@ The full documentation lives in the repository: <https://github.com/VladimirKuze
 - File map and the eight steps of one call: `docs/ARCHITECTURE.md`
 - Host interfaces this depends on, and what breaks when one moves: `docs/DSH-API.md`
 
-Install into a DSH profile:
+Install into a DSH profile — either from the **Plugins** page (Add plugin → paste
+`@vladimirkuzen/dsh-guardrails` → Install), or from a shell:
 
 ```powershell
 dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails

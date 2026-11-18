@@ -258,6 +258,21 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 附带观察（未改代码）：`loaded.json` 没有"策略是否有效"这个位置，加它属宿主可观测面改动，
 归入 2.0 候选（与 C-4 同类），P4 不动。
 
+### 7.2 第二次验收：全新 Windows 用户 + GUI 安装（2026-11-18 20:5x，用户执行）
+
+上一轮走的是"克隆 + `pnpm install` + 手写依赖"，这一轮换一个从未登录过的 Windows 本地用户，DSH 由安装包
+新装，插件从 **Plugins → Add plugin → 粘贴包名** 装——不碰仓库、不开 shell。
+
+| # | 项 | 结果 |
+|---|---|---|
+| 1 | GUI 安装 | 通过：输入 `@vladimirkuzen/dsh-guardrails` 即被接受（对话框支持 npm 包名 / Git 地址 / 本机目录，另有安装源选择） |
+| 2 | 加载 | 通过：`loaded.json` = `version 1.5.1`、`surface "ok"` |
+| 3 | 审计链 | 通过：`chain ok: 6 record(s) verified` |
+| 4 | 四份示例策略 | 通过：`examples/policy/*.json` 逐个 `--validate` → `policy ok: …` |
+
+结论：真实用户的安装路径是 GUI，`dsh` 不在 `PATH` 这件事因此不再阻塞安装；README 的安装节按此重写，
+仍是未验证项的只剩"该 CLI 在运行时解包前是否可用"。
+
 ## 8. 验收矩阵
 
 | # | 命令 | 期望 | 现状 |

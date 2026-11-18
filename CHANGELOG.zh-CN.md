@@ -4,6 +4,13 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
+## [未发布]
+
+- 安装节改成以 **Plugins → Add plugin → 粘贴包名** 为主路径——2026-11-18 的干净机器验收走的就是这条：
+  不用开 shell、不依赖 `dsh` 在 `PATH` 上，同一个对话框也接受 Git 地址与本机目录。命令行（`dsh plugin …`）
+  保留为备选，并注明桌面安装包不会把 `dsh` 放进 `PATH`、`%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\
+  runtime\cli\bin\dsh.cmd` 那份可能要等运行时解压后才能用（未验证）。卸载一节同步补上"在 Plugins 页面移除"。
+
 ## [1.5.1] — 2026-11-18
 
 - 已发布到 npm：`@vladimirkuzen/dsh-guardrails@1.5.1`（MIT，零运行时依赖）。tarball 含 `README.md`、

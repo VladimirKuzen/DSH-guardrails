@@ -94,14 +94,27 @@ Windows 11），其他宿主版本未测；包声明了 `engines.dsh: ">=0.2.0-0
 > `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\primary-runtime\`：把它拷到
 > `%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\`；或者自己装 Node LTS 和 `pnpm`，用 PATH 上的那两份。
 
-**从 npm 安装** —— 包已发布为 `@vladimirkuzen/dsh-guardrails`：
+**从 Plugins 页面安装** —— 最短的一条，不需要开 shell：
+
+1. 打开 DSH，进 **Plugins** 页。
+2. 点 **Add plugin**，粘贴 `@vladimirkuzen/dsh-guardrails`，安装源保持默认（或选 npm 官方源）。
+3. 安装，然后重启 DSH。
+
+同一个对话框也接受 Git 地址和本机目录，所以未发布的检出也能装，不用手改 JSON。
+
+**从 npm 安装（命令行）** —— 包已发布为 `@vladimirkuzen/dsh-guardrails`：
 
 ```powershell
 dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails
 ```
 
 `dsh plugin` 会把它转给 profile 目录里的 `pnpm`，并自动启用该 bundle，不需要手改 JSON；web 档位用
-`--profile web`。之后重启 DSH。
+`--profile web`。之后重启 DSH。桌面安装包不会把 `dsh` 放进 `PATH`，所以在普通 shell 里要调应用自带的那份
+（该 CLI 在运行时解压前能不能用，未验证——Plugins 页面没有这个依赖）：
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add @vladimirkuzen/dsh-guardrails
+```
 
 **从仓库检出安装** —— 想跑未发布的改动时：
 
@@ -258,8 +271,8 @@ npm test   # 依次跑十八个测试文件
 
 ## 卸载
 
-从 profile 的 `dsh.profile.bundles` 和 `dependencies` 里删掉 `@vladimirkuzen/dsh-guardrails`，重启 DSH。
-已有审计文件不会自动删除；需要的话自行清理。
+在 Plugins 页面里移除；或者从 profile 的 `dsh.profile.bundles` 和 `dependencies` 里删掉
+`@vladimirkuzen/dsh-guardrails`，重启 DSH。已有审计文件不会自动删除；需要的话自行清理。
 
 ## 许可证
 

@@ -107,14 +107,30 @@ Requires DSH on Windows. Developed against DSH desktop `0.2.2-rc.1` and verified
 > `%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\`, or install Node LTS plus `pnpm` yourself and use
 > those instead of the bundled ones.
 
-**From npm** — the package is published as `@vladimirkuzen/dsh-guardrails`:
+**From the Plugins page** — the shortest path, and the one that needs no shell:
+
+1. Open DSH and go to **Plugins**.
+2. Choose **Add plugin**, paste `@vladimirkuzen/dsh-guardrails`, and leave the install source at its default
+   (or pick the official npm registry).
+3. Install, then restart DSH.
+
+The same dialog accepts a Git address or a local directory, so it can also install an unreleased checkout
+without editing JSON by hand.
+
+**From npm, in a shell** — the package is published as `@vladimirkuzen/dsh-guardrails`:
 
 ```powershell
 dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails
 ```
 
 `dsh plugin` forwards to `pnpm` in the profile directory and enables the bundle for you, so there is no JSON
-to edit; use `--profile web` for the web profile. Then restart DSH.
+to edit; use `--profile web` for the web profile. Then restart DSH. The desktop installer does not put `dsh`
+on `PATH`, so from a plain shell call the copy that ships with the app instead (whether that CLI works before
+the runtime has been unpacked is untested — the Plugins page has no such dependency):
+
+```powershell
+& "$env:LOCALAPPDATA\Programs\DeepSeek Harness\resources\runtime\cli\bin\dsh.cmd" plugin --profile desktop add @vladimirkuzen/dsh-guardrails
+```
 
 **From a checkout** — for unreleased changes:
 
@@ -281,8 +297,9 @@ Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the chil
 
 ## Uninstall
 
-Remove `@vladimirkuzen/dsh-guardrails` from the profile's `dsh.profile.bundles` and its `dependencies`, then
-restart DSH. Existing audit files are left in place; delete them yourself if you want them gone.
+Remove it from the Plugins page, or remove `@vladimirkuzen/dsh-guardrails` from the profile's
+`dsh.profile.bundles` and its `dependencies`, then restart DSH. Existing audit files are left in place;
+delete them yourself if you want them gone.
 
 ## License
 
