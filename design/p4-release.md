@@ -216,34 +216,53 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 证据来源：本机拿不到该私有仓库的凭据（`SEC_E_NO_CREDENTIALS`），无法自行读取 run 页面；上表结论来自用户
 2026-11-17 23:19 的回报。run 的编号/链接可在 Actions 页面补记。
 
-## 7. 阶段 D：一小时内验收（进行中）
+## 7. 阶段 D：一小时内验收（已完成，2026-11-18）
 
 按 `design/p4-handoff.md` §7 的七步走一遍。分工（用户决定，2026-11-17 23:27）：
 
 | 步 | 谁 | 在哪 | 状态 |
 |---|---|---|---|
-| 1 安装 → `loaded.json` | 用户 | **一台还没装 DSH 的新机器** | 待做；比本机新建 profile 更接近"外人视角"，且不污染现有 profile |
-| 2 `check` 模板 → exit 2 | 本机 | `examples/policy/minimal-v1.json` | 已实测（2026-11-17 23:0x），阶段 D 复跑记时间 |
-| 3 真实弹卡 | 用户 | 新机器上的 DSH | 待做 |
-| 4 三档灰度 + 2 秒热读 | 用户 | 新机器上的 `policy.json` | 待做 |
-| 5 `--stats --verify` → `chain ok` | 本机 | 现有审计记录 | 待做 |
-| 6 DSH-API 升级核查清单 | 本机 | 纯阅读 | 待做 |
-| 7 `CONTRIBUTING` 加规则三处 | 本机 | 纯阅读（`docs.test.mjs` 保证链接可解析） | 待做 |
+| 1 安装 → `loaded.json` | 用户 | **一台还没装 DSH 的新机器** | 通过 2026-11-18（见 §7.1） |
+| 2 `check` 模板 → exit 2 | 本机 | `examples/policy/minimal-v1.json` | 通过（2026-11-18 复跑） |
+| 3 真实弹卡 | 用户 | 新机器上的 DSH | 通过（见 §7.1 第 3 项） |
+| 4 三档灰度 + 2 秒热读 | 用户 | 新机器上的 `policy.json` | 通过（`entries` 那条修好后） |
+| 5 `--stats --verify` → `chain ok` | 新机器 | 该机器上的审计记录 | 通过：`chain ok: 4 record(s) verified` |
+| 6 DSH-API 升级核查清单 | 本机 | 纯阅读 | 通过（2026-11-18） |
+| 7 `CONTRIBUTING` 加规则三处 | 本机 | 纯阅读（`docs.test.mjs` 保证链接可解析） | 通过（2026-11-18） |
 
 步 1 顺带暴露了一个真实缺口并已修：README 第 3 步原来只写 `pnpm install`，而干净机器上 `pnpm` 与 `node`
 都不在 `PATH` 里（本机实测 `Get-Command pnpm,node` 均为空，DSH 自带运行时在 `~/.dsh/dsh-runtimes/` 下）。
 现在中英 README 都给出调用自带 pnpm 的两行命令，并补了"先克隆仓库"这一步——否则外人根本没有 checkout 可 link。
 
+### 7.1 新机器验收结果（2026-11-18 09:12，用户执行并交回 `Result.md`）
+
+| # | 项 | 结果 | 证据 |
+|---|---|---|---|
+| 1 | 加载 | 通过 | `loaded.json`：`version 1.5.1`、`surface "ok"`、`at 2026-11-18T09:12:25.853Z`，`policyPath` 指向 `<home>\.dsh\guardrails\policy.json` |
+| 2 | `check` 判定 | 通过 | `review  R2 ask` + `exit=2` |
+| 3 | 真实弹卡 | 通过 | `requested` 09:12:25.839 → `delivered` …854（带 `approvalRequestId`）→ `outcome: allowed-once`/`source: user` …45.472 → `executed` …46.464，`prevHash` 首尾相接 |
+| 4 | 审计链 | 通过 | `chain ok: 4 record(s) verified` |
+| 5 | 自定义 `entries` | **首次失败 → 修文档后通过** | 首跑报 `entries[0].when.commandMatches: must start with "^"`；按 `fcff713` 修正示例后 `policy ok: …`、`block  E deny`、`exit=3` |
+
+第 5 项是这次验收的真正价值：策略被拒载时插件按 `index.js:232-271` 保留上一份好策略并写
+`config-invalid` 审计，**不弹卡、不在 `loaded.json` 留痕**，所以照抄一份没锚定的示例会静默失效。
+四份文档的示例因此都补了 `^`，`docs.test.mjs` 也加了"示例必须能通过 `validatePolicy`"的断言。
+一个已知余量：`cd repo; git push --force` 不匹配 `^\s*git\s+push`，会落到内置 R2（`ask`）而不是
+`entries` 的 `deny`——仍然弹卡，不静默。
+
+附带观察（未改代码）：`loaded.json` 没有"策略是否有效"这个位置，加它属宿主可观测面改动，
+归入 2.0 候选（与 C-4 同类），P4 不动。
+
 ## 8. 验收矩阵
 
 | # | 命令 | 期望 | 现状 |
 |---|---|---|---|
-| 1 | `node test/docs.test.mjs` | `pass 4` | 通过（2026-11-17） |
+| 1 | `node test/docs.test.mjs` | `pass 6` | 通过（2026-11-18） |
 | 2 | `git grep -n 'My Documents\|Users\\Administrator'` | 无命中 | 通过（18:02） |
 | 3 | `git log --all -S 'My Documents'` | 空 | 通过（18:02） |
 | 4 | `git rev-parse "v1.5.0^{commit}" "p3^{commit}"` | 同一提交 | 通过（18:02） |
-| 5 | `node tools/check.mjs --policy examples/policy/minimal-v1.json --tool pwsh --args '{"command":"git reset --hard"}'` | exit 2 | 阶段 D 复跑 |
-| 6 | 干净机器（未装过 DSH）按 README 装一遍 | `loaded.json` 出现 `version` + `surface:"ok"` | 待用户在新机器执行 |
+| 5 | `node tools/check.mjs --policy examples/policy/minimal-v1.json --tool pwsh --args -` + stdin `{"command":"git reset --hard"}` | exit 2 | 通过（2026-11-18：`review  R2 ask`，exit 2） |
+| 6 | 干净机器（未装过 DSH）按 README 装一遍 | `loaded.json` 出现 `version` + `surface:"ok"` | 通过（2026-11-18，见 §7.1） |
 | 7 | Actions 上的 `test` 首次运行 | 全绿 | 通过（23:19，用户确认） |
 
 ## 9. 风险登记（P4 新增）
@@ -262,11 +281,15 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 2. （已关闭，见 §5）`npm pack` 的产物：用 bundled `pnpm pack` 验过（38 → 40 项，0 泄漏，含 `package/README.md`
    与 `package/LICENSE`）；`npm pack` 本身未跑，两者同一套 `files` 白名单规则。
 3. `engines.dsh` 的宿主校验行为：在 `0.2.2-rc.1` 上插件正常加载，但没有观察到任何校验动作；宿主是否按
-   semver 校验、范围 `>=0.2.0-0` 对预发布版本（`0.2.2-rc.1`）是否成立，均未验证。
+   semver 校验、范围 `>=0.2.0-0` 对预发布版本是否成立，均未验证。另有一条版本漂移：2026-11-17 起本机
+   `runtime.json` 已是 `desktopVersion 0.2.2-rc.3`（exe `ProductVersion 0.2.2.0`），README 仍写"测于
+   `0.2.2-rc.1`"——措辞待定（写实际测过的 rc.1，还是跟着宿主升级改写，需要一次实测后再定）。
 4. （已关闭，见 §6）GitHub Actions 工作流：YAML 被 GitHub 解析器接受，两个步骤跑完。
 5. 仓库可见性切换：未执行（P4 的最后一个动作）。
 6. GitHub Release 页面与 tag 归档：未创建。
-7. "外人一小时装好"：需要一条干净 profile，公开后补做。
+7. （已关闭，见 §7.1）"外人一小时装好"：用户在一台未装过 DSH 的机器上按 README 装完并跑完 4+1 项验收；
+   实际耗时超过一小时，差额来自三处文档缺陷（缺"先克隆"、`pnpm` 不在 `PATH`、`entries` 示例没锚定），
+   都已修进文档。真正的"外人"（无我参与的第三人）仍未测。
 8. 重建后的远端内容：本机沙箱拿不到 GitHub 凭证（`SEC_E_NO_CREDENTIALS`），只能由用户跑 `git ls-remote origin`
    （期望 11 个 ref）与打开旧提交 URL（期望 404）来确认。
 

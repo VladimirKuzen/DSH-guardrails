@@ -55,18 +55,19 @@ P4 的过程、拍板与验证证据记在 `design/p4-release.md`。
 
 ### 3.3 包元数据
 
-- [ ] 决定包名与 scope（见 §2.2），同时去掉 `"private": true`
-- [x] `license`、`repository`（后者还没加）、`files` 白名单、`bin`、`exports`、`engines.dsh`
-- [ ] `repository` / `homepage` / `bugs` 三个字段（公开前必须填，否则 npm 页是空的）
-- [ ] `engines.dsh` 当前是 `">=0.2.0-0"`；宿主是否校验它尚未验证（`docs/DSH-API.md` 里标的是"我们不校验"），公开前要么验证一次、要么在 README 写清"仅在 0.2.x 上测过"
-- [ ] 版本规则写进 `CONTRIBUTING.md`：`1.x` 内保持协议兼容（审计字段、`policy.schema.json` 只加不改），破坏性变更升 2.0
+- [x] 包名与 scope 已拍板：保留 `@vlad/dsh-guardrails`（`dsh-guardrails` 在 npm 上已被占用）
+- [ ] 公开时去掉 `"private": true`（与仓库可见性切换同一批动作，`design/p4-release.md` §9 有拆开改的理由）
+- [x] `license`、`files` 白名单、`bin`、`exports`、`engines.dsh`（`repository` 见下一行）
+- [x] `repository` / `homepage` / `bugs` 三个字段（`e9fb04c`）
+- [x] `engines.dsh` 仍为 `">=0.2.0-0"`，未观察到宿主校验：README 已写明"测于 DSH desktop `0.2.2-rc.1`，其它版本未测"（`design/p4-release.md` §10 记了版本漂移）
+- [x] 版本规则写进 `CONTRIBUTING.md`：`1.x` 内保持协议兼容（审计字段、`policy.schema.json` 只加不改），破坏性变更升 2.0
 
 ### 3.4 CI
 
-- [ ] GitHub Actions：`windows-latest` + 与宿主一致的 Node 主版本，跑 `npm test`（18 个文件串联）
+- [x] GitHub Actions：`windows-latest` + Node 24，跑 `npm test`（`5a178a1`；2026-11-17 23:19 首次远端全绿）
 - [x] i18n parity：`i18n/zh.json` 与 `i18n/en.json` 的 key 集合必须相等（现在由 `test/docs.test.mjs` 保证，含占位符集合）
-- [ ] `check` CLI 冒烟：`node tools/check.mjs --tool pwsh --args '{"command":"git reset --hard"}'` 期望 exit 2；这条也能当文档里的可复制示例
-- [ ] 不做 macOS/Linux job（见非目标）
+- [x] `check` CLI 冒烟：stdin 传 `{"command":"git reset --hard"}`，期望 `exit 2`；本机与 CI 各跑一次
+- [x] 不做 macOS/Linux job（见非目标）
 
 ## 4. P3 遗留的两项（不阻塞发布，但要在 README/CONTRIBUTING 里有位置）
 
@@ -104,6 +105,9 @@ P4 的过程、拍板与验证证据记在 `design/p4-release.md`。
 5. 用 `tools/audit-report.mjs --stats --verify` 看到 `chain ok`。
 6. 找到 `docs/DSH-API.md` 的升级核查清单，确认自己知道 DSH 大版本升级后先看哪一行。
 7. 读 `CONTRIBUTING.md`，知道加一条规则要碰哪三个文件。
+
+状态（2026-11-18）：七步已在一台未装过 DSH 的机器上走完，结果与两处文档缺陷见
+`design/p4-release.md` §7.1。第 1 步的版本号现在是 `1.5.1`。
 
 ## 8. 建议顺序
 
