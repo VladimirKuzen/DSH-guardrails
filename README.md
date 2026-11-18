@@ -108,6 +108,15 @@ enforcing it. The package is not on a registry yet, so link a checkout into a pr
    ```
 
 3. Add `@vlad/dsh-guardrails` to `dsh.profile.bundles` in the same file.
+
+> **The runtime is lazy.** DSH unpacks its bundled `node` and `pnpm` on first need, not on first launch: a
+> fresh install does not create `%USERPROFILE%\.dsh\dsh-runtimes\` just by being started. Use the host once
+> with a tool that shells out, or let the plugin manager install anything, and the directory appears. If it
+> stays missing, the installer ships the same payload at
+> `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\primary-runtime\`: copy it to
+> `%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\`, or install Node LTS plus `pnpm` yourself and use
+> those instead of the bundled ones.
+
 4. Run `pnpm install` in the profile directory. A clean machine has no `pnpm` (or `node`) on `PATH` — DSH
    brings its own runtime — so call that copy:
 
@@ -265,3 +274,4 @@ restart DSH. Existing audit files are left in place; delete them yourself if you
 ## License
 
 MIT.
+

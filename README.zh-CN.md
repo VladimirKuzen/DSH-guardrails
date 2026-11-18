@@ -97,6 +97,13 @@ R3 故意更严格：宿主会按工具调用原样回显 shell 命令，如果�
    ```
 
 3. 在同一个文件的 `dsh.profile.bundles` 里加上 `@vlad/dsh-guardrails`。
+
+> **运行时是懒加载的。** DSH 自带的 `node` 与 `pnpm` 在第一次**真正需要**时才解压，不是第一次启动就解压：
+> 全新安装后只启动一次，`%USERPROFILE%\.dsh\dsh-runtimes\` 不会出现。先用一次会调外部命令的工具，或者让
+> 插件管理器装一个 bundle，目录就出来了。仍然没有的话，安装包里带着同一份载荷，路径是
+> `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\runtime\primary-runtime\`：把它拷到
+> `%USERPROFILE%\.dsh\dsh-runtimes\dsh-primary-runtime\`；或者自己装 Node LTS 和 `pnpm`，用 PATH 上的那两份。
+
 4. 在 profile 目录执行 `pnpm install`。干净机器上 `pnpm`（和 `node`）都不在 `PATH` 里——DSH 自带运行时——
    所以用自带的那份：
 
@@ -244,3 +251,4 @@ npm test   # 依次跑十八个测试文件
 ## 许可证
 
 MIT。
+
