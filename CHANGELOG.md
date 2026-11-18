@@ -12,6 +12,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   does not put `dsh` on `PATH` and that the copy under `%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\
   runtime\cli\bin\dsh.cmd` may need the runtime unpacked first (untested). Uninstall gained the matching
   "remove it from the Plugins page" path.
+- The mount check (`loaded.json`: fresh mtime, matching version, `surface`) is now its own heading instead of the
+  last step of the checkout path, so people who install from the Plugins page can find it; the development
+  section notes that `npm test` is only a chain of `node test/<file>.mjs` for machines without `npm`.
 
 ## [1.5.1] — 2026-11-18
 

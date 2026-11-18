@@ -112,7 +112,8 @@ Requires DSH on Windows. Developed against DSH desktop `0.2.2-rc.1` and verified
 1. Open DSH and go to **Plugins**.
 2. Choose **Add plugin**, paste `@vladimirkuzen/dsh-guardrails`, and leave the install source at its default
    (or pick the official npm registry).
-3. Install, then restart DSH.
+3. Install, then restart DSH. Once it is back, check that it mounted
+   (see [Verify it mounted](#verify-it-mounted)).
 
 The same dialog accepts a Git address or a local directory, so it can also install an unreleased checkout
 without editing JSON by hand.
@@ -152,7 +153,9 @@ the runtime has been unpacked is untested — the Plugins page has no such depen
 
 5. Restart DSH. Host plugins do not hot-reload.
 
-Verify it mounted: `~/.dsh/guardrails/loaded.json` should have a fresh mtime, a `version` matching
+### Verify it mounted
+
+Whichever path you took, `~/.dsh/guardrails/loaded.json` should have a fresh mtime, a `version` matching
 `dsh-guardrails/package.json`, and `surface: "ok"`. **Do not trust the pid** — the host process can be
 replaced while the gate keeps working in a new one. Freshness plus version (plus surface) is the signal.
 
@@ -276,6 +279,8 @@ npm test   # runs the eighteen test files in order
 ```
 
 Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the child processes that runner spawns.
+No `npm` on the machine? `npm test` is only a chain of `node test/<file>.mjs` — run those one by one with
+whichever `node` you have; [CONTRIBUTING.md](CONTRIBUTING.md) has the details.
 
 ## Limits
 

@@ -98,7 +98,7 @@ Windows 11），其他宿主版本未测；包声明了 `engines.dsh: ">=0.2.0-0
 
 1. 打开 DSH，进 **Plugins** 页。
 2. 点 **Add plugin**，粘贴 `@vladimirkuzen/dsh-guardrails`，安装源保持默认（或选 npm 官方源）。
-3. 安装，然后重启 DSH。
+3. 安装，然后重启 DSH。起来之后确认它挂上了（见[确认已挂载](#确认已挂载)）。
 
 同一个对话框也接受 Git 地址和本机目录，所以未发布的检出也能装，不用手改 JSON。
 
@@ -136,7 +136,9 @@ dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails
 
 5. 重启 DSH。宿主插件不会热重载。
 
-确认它挂上了：`~/.dsh/guardrails/loaded.json` 的修改时间是最近的、版本与
+### 确认已挂载
+
+不管走哪条路，`~/.dsh/guardrails/loaded.json` 的修改时间都应该是最近的、版本与
 `dsh-guardrails/package.json` 一致、且 `surface` 是 `"ok"`。**不要看 pid**——宿主进程会被替换，
 而门禁可能在新进程里继续工作。"时间新鲜 + 版本一致 + surface"才是判据。
 
@@ -252,7 +254,9 @@ node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 npm test   # 依次跑十八个测试文件
 ```
 
-要用 `node <文件>` 而不是 `node --test`：DSH 沙箱不允许测试运行器派生子进程。
+要用 `node <文件>` 而不是 `node --test`：DSH 沙箱不允许测试运行器派生子进程。机器上没有 `npm`？
+`npm test` 只是一串 `node test/<文件>.mjs`，用手边的 `node` 逐个跑即可——细节见
+[CONTRIBUTING.md](CONTRIBUTING.md)。
 
 ## 已知限制
 

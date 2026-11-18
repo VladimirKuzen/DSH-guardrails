@@ -10,6 +10,8 @@
   不用开 shell、不依赖 `dsh` 在 `PATH` 上，同一个对话框也接受 Git 地址与本机目录。命令行（`dsh plugin …`）
   保留为备选，并注明桌面安装包不会把 `dsh` 放进 `PATH`、`%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\
   runtime\cli\bin\dsh.cmd` 那份可能要等运行时解压后才能用（未验证）。卸载一节同步补上"在 Plugins 页面移除"。
+- 挂载检查（`loaded.json`：时间新鲜、版本一致、`surface`）从"检出安装"的最后一步提成独立小节，从
+  Plugins 页安装的人也能读到；开发一节补一句"没有 `npm` 时，`npm test` 就是一串 `node test/<文件>.mjs`"。
 
 ## [1.5.1] — 2026-11-18
 
