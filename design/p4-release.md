@@ -270,6 +270,7 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 | 6 | 干净机器（未装过 DSH）按 README 装一遍 | `loaded.json` 出现 `version` + `surface:"ok"` | 通过（2026-11-18，见 §7.1） |
 | 7 | Actions 上的 `test` 首次运行 | 全绿 | 通过（23:19，用户确认） |
 | 8 | `npm view @vladimirkuzen/dsh-guardrails versions dist-tags` | `1.5.1` 在 `versions` 里，`latest` 指向它 | 通过（2026-11-18 19:44，见 §12） |
+| 9 | GitHub Releases 页面 | `v1.5.1` 可见且为 latest | 通过（2026-11-18 20:02，用户确认） |
 
 ## 9. 风险登记（P4 新增）
 
@@ -294,7 +295,8 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
 5. （已关闭，2026-11-18）仓库可见性切换：已转公开（匿名 API 读到 `private=false`、`visibility=public`），
    分支保护 ruleset 已启用并要求 `windows` 这个 status check。三项 GitHub 设置里，私有漏洞报告与 Dependabot
    只在公开后可用，现在都已可用。
-6. GitHub Release 页面与 tag 归档：未创建。
+6. （已关闭，2026-11-18 20:02）GitHub Release 页面：`v1.5.1` 已发布并显示为 latest；正文取自 CHANGELOG 的
+   `[1.5.1]` 段，标注 Windows-only 与 npm 安装命令。
 7. （已关闭，见 §7.1）"外人一小时装好"：用户在一台未装过 DSH 的机器上按 README 装完并跑完 4+1 项验收；
    实际耗时超过一小时，差额来自三处文档缺陷（缺"先克隆"、`pnpm` 不在 `PATH`、`entries` 示例没锚定），
    都已修进文档。真正的"外人"（无我参与的第三人）仍未测。
@@ -339,5 +341,5 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
   它不会被自动删除，但 `latest` 已指向 `1.5.1`，只有显式指定 `@0.0.0-stage` 才会装到它；如需处理，
   `npm deprecate "@vladimirkuzen/dsh-guardrails@0.0.0-stage" "placeholder"`（需要 2FA）。
 - 发布者身份是 `vladimirkuzen <ryhdllg@gmail.com>`（registry 的 `maintainers` 字段）。
-- `v1.5.1` 这个 tag 仍指向发布前的提交；本文件的 §12 落进某个提交后，tag 需要移到那个提交上（用户执行
-  `git tag -f` + `git push -f origin v1.5.1`）。
+- `v1.5.1` 这个 tag 最初指向发布前的提交，已在本地移到 `8dab831` 并强制推送到远端。
+- GitHub Release 页面 `v1.5.1` 已发布（2026-11-18 20:02，用户确认），作为首个 release 自动成为 latest。
