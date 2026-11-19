@@ -302,10 +302,16 @@ force-push 只保证"新历史里没有路径"，不保证旧对象不可达；G
    `npm ci` 仍不会被执行——零依赖、无 lockfile，也不需要 install。
 2. （已关闭，见 §5）`npm pack` 的产物：用 bundled `pnpm pack` 验过（38 → 40 项，0 泄漏，含 `package/README.md`
    与 `package/LICENSE`）；`npm pack` 本身未跑，两者同一套 `files` 白名单规则。
-3. `engines.dsh` 的宿主校验行为：在 `0.2.2-rc.1` 上插件正常加载，但没有观察到任何校验动作；宿主是否按
-   semver 校验、范围 `>=0.2.0-0` 对预发布版本是否成立，均未验证。另有一条版本漂移：2026-11-17 起本机
-   `runtime.json` 已是 `desktopVersion 0.2.2-rc.3`（exe `ProductVersion 0.2.2.0`），README 仍写"测于
-   `0.2.2-rc.1`"——措辞待定（写实际测过的 rc.1，还是跟着宿主升级改写，需要一次实测后再定）。
+3. （已关闭，2026-11-19）`engines.dsh` 与宿主版本：宿主没有校验该字段的动作，实测范围 `>=0.2.0-0` 对
+   `0.2.2-rc.5` 成立（用 dshmarket 同款 `satisfiesRange(..., {includePrerelease:true})`）。桌面应用升到
+   `0.2.2-rc.5`（exe `FileVersion 0.2.2-rc.5`）后，`docs/DSH-API.md` 的五步验收全部通过：`loaded.json`
+   写入 `at 2026-11-19T13:02:36.051Z`、`version 1.5.1`、`surface "ok"`；必问调用弹卡且审计四段完整
+   （`requested 13:03:25` → `delivered 13:03:25` → `outcome allowed-once 13:03:43` → `executed 13:03:44`）；
+   必拒调用返回我们的 R2 原文且不弹卡；`chain ok: 1276 record(s) verified`；`policy ok`。README 与
+   `DSH-API.md` 的 tested 版本随之改成 rc.5。
+   一个遗留事实：`~/.dsh/dsh-runtimes/dsh-primary-runtime/runtime.json` 仍写 `desktopVersion 0.2.2-rc.3`
+   （该文件 2026-11-13 之后未再改写），而 `resources/runtime/versions.json` 的 node/pnpm 版本与旧载荷相同
+   （24.21.0 / 11.28.5）——无法从文件名判断载荷是否被换成新的一份，只能说"插件所在的桌面进程是 rc.5"。
 4. （已关闭，见 §6）GitHub Actions 工作流：YAML 被 GitHub 解析器接受，两个步骤跑完。
 5. （已关闭，2026-11-18）仓库可见性切换：已转公开（匿名 API 读到 `private=false`、`visibility=public`），
    分支保护 ruleset 已启用并要求 `windows` 这个 status check。三项 GitHub 设置里，私有漏洞报告与 Dependabot

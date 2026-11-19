@@ -5,7 +5,9 @@ sandbox: if the host changes a name or a shape, the gate can degrade **silently*
 — it keeps returning `next()` and looks healthy. This page exists so that an
 upgrade can be checked in five minutes instead of discovered in an incident.
 
-Tested against DSH as installed on 2026-11-17 (`engines.dsh: >=0.2.0-0`).
+Tested against DSH desktop `0.2.2-rc.5` (`engines.dsh: >=0.2.0-0`). Earlier runs: development on `0.2.2-rc.1`,
+clean-machine acceptance on `0.2.2-rc.3`; the `rc.4`/`rc.5` release notes contain no plugin-API changes, and the
+five steps below were re-run on `rc.5` on 2026-11-19.
 
 ## What is used, and what breaks if it moves
 

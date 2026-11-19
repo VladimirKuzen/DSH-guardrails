@@ -95,9 +95,9 @@ shape change shows up instead of looking healthy.
 
 ## Install
 
-Requires DSH on Windows. Developed against DSH desktop `0.2.2-rc.1` and verified on a clean machine with
-`0.2.2-rc.3`, both on Windows 11; other host versions are untested. The package declares
-`engines.dsh: ">=0.2.0-0"`, but the host was not observed enforcing it.
+Requires DSH on Windows. Developed against DSH desktop `0.2.2-rc.1`, verified on a clean machine with
+`0.2.2-rc.3`, and re-verified on `0.2.2-rc.5` after the host upgrade; other host versions are untested. The
+package declares `engines.dsh: ">=0.2.0-0"`, but the host was not observed enforcing it.
 
 > **The runtime is lazy.** DSH unpacks its bundled `node` and `pnpm` on first need, not on first launch: a
 > fresh install does not create `%USERPROFILE%\.dsh\dsh-runtimes\` just by being started. Use the host once
