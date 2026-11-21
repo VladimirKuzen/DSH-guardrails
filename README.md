@@ -159,6 +159,16 @@ Whichever path you took, `~/.dsh/guardrails/loaded.json` should have a fresh mti
 `dsh-guardrails/package.json`, and `surface: "ok"`. **Do not trust the pid** — the host process can be
 replaced while the gate keeps working in a new one. Freshness plus version (plus surface) is the signal.
 
+### Updating
+
+Update the same way you installed it: **Plugins → Add plugin** with the same package name replaces the
+installed version, and in a shell it is
+`dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails@latest`; restart DSH afterwards. An update
+does not touch `policy.json` or the audit directory. Then run
+`node dsh-guardrails/tools/doctor.mjs` (see [Check the installation](#check-the-installation)): it fails when
+two copies ended up mounted, when `loaded.json` still reports the old version, when the policy stopped
+validating, or when the audit chain was broken.
+
 ## Configure
 
 | What | Where |
@@ -250,6 +260,25 @@ node dsh-guardrails/tools/audit-report.mjs --verify    # hash-chain check, exit 
 node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 ```
 
+## Check the installation
+
+```powershell
+node dsh-guardrails/tools/doctor.mjs            # human-readable report
+node dsh-guardrails/tools/doctor.mjs --json     # one object, for scripts
+node dsh-guardrails/tools/doctor.mjs --profile web
+```
+
+Four checks, all read-only and offline. **One installed copy**: two dependency names resolving to the same
+source, or two sources that both claim to be this package, make every call produce two cards. **Liveness**:
+`loaded.json` matches the installed version and reports `surface: "ok"`. **Policy**: the configured file
+passes validation. **Audit chain**: the hash chain still verifies. Exit `0` when every deterministic check
+passes, `1` when one fails, `2` on a usage error. A missing policy file is a warning (the built-in defaults
+are in use), not a failure.
+
+`--deep` additionally scans the other bundles in the profile for the `tools/pre-execute` string and reports
+"suspected" listeners. It is a heuristic — it cannot see which listener the host actually calls — so its
+findings never change the exit code.
+
 ## Repository layout
 
 | Path | Purpose |
@@ -260,7 +289,7 @@ node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 | `dsh-guardrails/i18n/` | Card strings (`zh.json`, `en.json`) |
 | `dsh-guardrails/locale/` | Plugin metadata the **host** reads: title, subtitle, and which `detail` page to open. Not used by the gate; do not delete |
 | `dsh-guardrails/test/` | Unit, contract, CLI and mount-level tests |
-| `dsh-guardrails/tools/` | `check.mjs` (ask the gate from a terminal), `audit-report.mjs` (offline reader) |
+| `dsh-guardrails/tools/` | `check.mjs` (ask the gate from a terminal), `audit-report.mjs` (offline reader), `doctor.mjs` (installation health check) |
 | `design/` | Decision records: measurements, rejected alternatives, known gaps |
 | `CHANGELOG.md` | Release history — English and Chinese versions |
 | `SECURITY.md` | Supported versions, what is in scope, how to report privately |

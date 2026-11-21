@@ -21,6 +21,7 @@ git-remote.local.txt
 
 # Dependencies and editor state
 node_modules/
+.pnpm-store/
 .vscode/
 .idea/
 Thumbs.db

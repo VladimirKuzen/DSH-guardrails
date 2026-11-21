@@ -35,6 +35,7 @@ published as the package.
 | `dsh-guardrails/examples/policy/` | Copy-paste policy templates, validated by `test/examples.test.mjs` | yes |
 | `dsh-guardrails/tools/check.mjs` | `dsh-guardrails check` — asks the same `evaluate()` from a terminal | yes |
 | `dsh-guardrails/tools/audit-report.mjs` | Offline reader for the audit stream | yes |
+| `dsh-guardrails/tools/doctor.mjs` | Read-only installation check: duplicate copies, liveness, policy, audit chain; `--deep` scans other bundles for the hook string | yes |
 | `dsh-guardrails/test/` | Unit, contract, CLI and mount-level tests | no |
 | `design/` | Decision records: why a rule exists, what was measured, what was rejected | no |
 | `README.md`, `CHANGELOG.md` | Entry point and history (English + Chinese twins) | no |

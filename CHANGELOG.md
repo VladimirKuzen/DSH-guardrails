@@ -6,6 +6,18 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
 
 ## [Unreleased]
 
+- New `tools/doctor.mjs`: a read-only, offline installation check. It reports a duplicate install (two
+  dependency names on one copy, or two copies claiming the package), a `loaded.json` that does not match the
+  installed version or a `surface` other than `ok`, a policy file that no longer validates, and a broken audit
+  hash chain. `--deep` additionally lists bundles whose source mentions `tools/pre-execute` as **suspected**
+  listeners; those findings never change the exit code. Exit `0` when every deterministic check passes, `1`
+  when one fails, `2` on a usage error; a missing policy file is a warning (built-in defaults in use).
+- README gained an **Updating** subsection (an update replaces the installed version, leaves `policy.json` and
+  `audit/` alone, and is verified with doctor) and a **Check the installation** section for doctor; the
+  repository layout lists the new tool.
+- The 1.5.2 release gate now includes an upgrade drill: install 1.5.1 into a throwaway `DSH_HOME`, update it
+  to 1.5.2, and require doctor to stay green (`design/v1.5.2-self-check.md` §10). Doctor is also part of the
+  drill's evidence, not just of the drill.
 - Install is now documented as **Plugins → Add plugin → paste the package name**, which is how a clean machine
   was verified on 2026-11-18: no shell, no `PATH` problem, and the same dialog also accepts a Git address or a
   local directory. The CLI (`dsh plugin …`) stays as the alternative, with a note that the desktop installer

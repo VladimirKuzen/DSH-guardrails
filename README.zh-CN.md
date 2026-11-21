@@ -142,6 +142,14 @@ dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails
 `dsh-guardrails/package.json` 一致、且 `surface` 是 `"ok"`。**不要看 pid**——宿主进程会被替换，
 而门禁可能在新进程里继续工作。"时间新鲜 + 版本一致 + surface"才是判据。
 
+### 更新
+
+更新与安装走同一条路：**插件页 → 添加插件**，填同一个包名就会替换已装版本；命令行是
+`dsh plugin --profile desktop add @vladimirkuzen/dsh-guardrails@latest`，之后重启 DSH。更新不会碰
+`policy.json` 和 `audit/`。更新完跑一次 `node dsh-guardrails/tools/doctor.mjs`（见
+[检查安装](#检查安装)）：装成了两份、`loaded.json` 还停在旧版本、策略不再通过校验、审计链断裂，
+这四种情况它都会报出来。
+
 ## 配置
 
 | 内容 | 位置 |
@@ -226,6 +234,22 @@ node dsh-guardrails/tools/audit-report.mjs --verify    # 校验哈希链，断�
 node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 ```
 
+## 检查安装
+
+```powershell
+node dsh-guardrails/tools/doctor.mjs            # 人读报告
+node dsh-guardrails/tools/doctor.mjs --json     # 一个对象，给脚本
+node dsh-guardrails/tools/doctor.mjs --profile web
+```
+
+四项检查，全部只读、不联网。**只有一份安装**：两个依赖名指向同一份源码，或两份源码都自称本包，
+都会让每次调用出两张卡。**心跳**：`loaded.json` 与已安装版本一致，且 `surface` 为 `"ok"`。
+**策略**：配置的策略文件能通过校验。**审计链**：哈希链仍然完整。全部确定性检查通过时退出码 `0`，
+有一项失败为 `1`，用法错误为 `2`。策略文件缺失只是警告（正在使用内置默认值），不算失败。
+
+`--deep` 额外扫描 profile 里其它 bundle 的源码，找 `tools/pre-execute` 字符串，报"疑似"监听者。
+这是启发式——看不到宿主实际调用了谁——所以它的发现从不改变退出码。
+
 ## 仓库结构
 
 | 路径 | 用途 |
@@ -236,7 +260,7 @@ node dsh-guardrails/tools/audit-report.mjs --event observed --rule R1
 | `dsh-guardrails/i18n/` | 卡片文案（`zh.json`、`en.json`） |
 | `dsh-guardrails/locale/` | **宿主**读的插件元数据：标题、副标题、点开看哪个 `detail` 页面。门禁本身不用它，不要删 |
 | `dsh-guardrails/test/` | 单元、契约、命令行与挂载级测试 |
-| `dsh-guardrails/tools/` | `check.mjs`（在终端里问一句）、`audit-report.mjs`（离线读取） |
+| `dsh-guardrails/tools/` | `check.mjs`（在终端里问一句）、`audit-report.mjs`（离线读取）、`doctor.mjs`（安装自检） |
 | `design/` | 决策记录：测量数据、被否掉的方案、已知缺口 |
 | `CHANGELOG.md` | 版本历史（英文与中文两份） |
 | `SECURITY.md` | 支持哪些版本、什么算漏洞、怎么私密报告 |
