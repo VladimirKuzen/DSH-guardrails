@@ -1,7 +1,7 @@
 # Architecture
 
 How the pieces fit, so a change lands in the right file. It describes the
-checkout as of `1.5.0`; the file names matter, line numbers do not.
+checkout as of `1.5.2`; the file names matter, line numbers do not.
 
 ## Two trees
 

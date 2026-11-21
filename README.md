@@ -11,7 +11,7 @@ and leaves a local audit trail of what was gated.
 - **Auditable**: every gated call writes one JSONL line; secrets are never written in clear text.
 - **Windows-only**, 1.x. Path semantics assume Windows (`~`, `%VAR%`, `$env:VAR`, backslashes).
 
-**Status**: v1.5.1. The critical tier and the audit v2 stream were verified live on Windows 11
+**Status**: v1.5.2. The critical tier and the audit v2 stream were verified live on Windows 11
 (2026-11-15): denied calls return no card and never execute, an approved call produces the full
 `requested → delivered → outcome → executed` chain with a payload, and `--verify` validates the hash chain.
 Since then the ranked engine (`version: 2`), custom `entries`, `observe`, the two-stage dry run, workspace
@@ -304,7 +304,7 @@ them locally, then encrypts the result with Windows DPAPI (bound to the current 
 No build step, no runtime dependencies. Tests run directly:
 
 ```powershell
-npm test   # runs the eighteen test files in order
+npm test   # runs the nineteen test files in order
 ```
 
 Run them with `node <file>`, not `node --test`: the DSH sandbox forbids the child processes that runner spawns.

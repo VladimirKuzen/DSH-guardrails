@@ -10,7 +10,7 @@
 - **可审计**：每次被拦截的调用写一行 JSONL；密钥永远不以明文落盘。
 - **仅 Windows**，1.x。路径语义按 Windows 处理（`~`、`%VAR%`、`$env:VAR`、反斜杠）。
 
-**状态**：v1.5.1。P1.6 系统级硬停与审计 v2 已在 Windows 11 上完成 live 验收（2026-11-15）：deny 不弹卡、
+**状态**：v1.5.2。P1.6 系统级硬停与审计 v2 已在 Windows 11 上完成 live 验收（2026-11-15）：deny 不弹卡、
 命令不执行；批准后的调用产生完整的 `requested → delivered → outcome → executed` 链并带 payload；
 `--verify` 能校验哈希链。此后又加入了排序引擎（`version: 2`）、自定义 `entries`、`observe`、
 两阶段预演、工作区静默与 `check` 命令行，并逐项做过 live 验收；每一步的原因与验证方式记在
@@ -275,7 +275,7 @@ node dsh-guardrails/tools/doctor.mjs --profile web
 无构建、无运行时依赖，测试直接跑：
 
 ```powershell
-npm test   # 依次跑十八个测试文件
+npm test   # 依次跑十九个测试文件
 ```
 
 要用 `node <文件>` 而不是 `node --test`：DSH 沙箱不允许测试运行器派生子进程。机器上没有 `npm`？

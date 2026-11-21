@@ -4,8 +4,9 @@
 
 本护栏的显著变更，最新在前。版本号跟随 `dsh-guardrails/package.json`。
 
-## [未发布]
+## [1.5.2] — 2026-11-21
 
+- 版本 1.5.2。`lib/`、`rules.js`、`index.js` 一行没动：这一版加的是工具、文档与发版门槛，不是闸门语义。
 - 新增 `tools/doctor.mjs`：只读、离线的安装自检。报告重复安装（两个依赖名指向同一份，或两份源码都自称
   本包）、`loaded.json` 与已安装版本不一致或 `surface` 不是 `ok`、策略文件不再通过校验、审计哈希链断裂。
   `--deep` 额外列出源码里提到 `tools/pre-execute` 的 bundle，措辞是**疑似**；这类发现从不改变退出码。
@@ -14,6 +15,8 @@
   **检查安装** 一节；仓库结构表补上这个工具。
 - 1.5.2 的发版门槛增加一次升级演练：在一次性 `DSH_HOME` 里装 1.5.1、升到 1.5.2，要求 doctor 全绿
   （`design/v1.5.2-self-check.md` §10）。doctor 既是演练的手段，也是演练的证据。
+- `pnpm pack` 产物 41 个文件（约 79 KB），含 `tools/doctor.mjs`，没有 `test/` 或 `design/`；已按自检文档
+  §10-A 核对，tarball 里的版本号已是 1.5.2。
 - 安装节改成以 **Plugins → Add plugin → 粘贴包名** 为主路径——2026-11-18 的干净机器验收走的就是这条：
   不用开 shell、不依赖 `dsh` 在 `PATH` 上，同一个对话框也接受 Git 地址与本机目录。命令行（`dsh plugin …`）
   保留为备选，并注明桌面安装包不会把 `dsh` 放进 `PATH`、`%LOCALAPPDATA%\Programs\DeepSeek Harness\resources\

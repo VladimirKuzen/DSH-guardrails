@@ -1,6 +1,6 @@
 {
   "name": "@vladimirkuzen/dsh-guardrails",
-  "version": "1.5.1",
+  "version": "1.5.2",
   "description": "Blocks risky DSH tool calls before they run: protects DSH's own home, stops destructive shell commands, and flags secrets in tool arguments. Windows only.",
   "license": "MIT",
   "repository": {
