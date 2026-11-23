@@ -20,7 +20,7 @@
 import { existsSync, readFileSync, readdirSync, realpathSync, statSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 import { describeErrors, validatePolicy } from '../lib/policy/validate.js';
 import { verifyChain } from '../lib/audit/v2.js';
@@ -381,6 +381,22 @@ export function run(argv, {
   return report.ok ? EXIT.ok : EXIT.problems;
 }
 
-if (process.argv[1] !== undefined && pathToFileURL(process.argv[1]).href === import.meta.url) {
+// A profile may reach this file through a junction (`link:` installs on Windows),
+// so argv[1] and import.meta.url can be two spellings of one file. Compare
+// canonical paths; otherwise the tool would exit 0 without printing anything.
+export function sameEntryPath(argvPath, modulePath) {
+  if (argvPath === undefined) return false;
+  try {
+    return realpathSync(argvPath) === realpathSync(modulePath);
+  } catch {
+    return pathToFileURL(argvPath).href === pathToFileURL(modulePath).href;
+  }
+}
+
+function isMainEntry() {
+  return sameEntryPath(process.argv[1], fileURLToPath(import.meta.url));
+}
+
+if (isMainEntry()) {
   process.exitCode = run(process.argv.slice(2));
 }

@@ -1,13 +1,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, symlinkSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-import { run } from '../tools/doctor.mjs';
+import { run, sameEntryPath } from '../tools/doctor.mjs';
 import { AuditLog } from '../lib/audit/v2.js';
 
 const PACKAGE_NAME = '@vladimirkuzen/dsh-guardrails';
+const packageRoot = fileURLToPath(new URL('..', import.meta.url));
 
 /** Run doctor against a throwaway home and keep every line it printed. */
 function doctor(args, home) {
@@ -156,4 +158,24 @@ test('an unknown argument is a usage error', () => {
   const { code, err } = doctor(['--nope'], home);
   assert.equal(code, 2);
   assert.match(err.join('\n'), /unknown argument: --nope/);
+});
+
+test('treats a junction path and its target as one entry file', { skip: process.platform !== 'win32' }, (t) => {
+  const home = mkdtempSync(join(tmpdir(), 'doctor-junction-'));
+  try {
+    const link = join(home, 'linked-package');
+    try {
+      symlinkSync(packageRoot, link, 'junction');
+    } catch (error) {
+      if (error.code === 'EPERM' || error.code === 'EACCES') {
+        t.skip('creating a junction is not permitted in this environment');
+        return;
+      }
+      throw error;
+    }
+    assert.equal(sameEntryPath(join(link, 'tools', 'doctor.mjs'), join(packageRoot, 'tools', 'doctor.mjs')), true);
+    assert.equal(sameEntryPath(undefined, join(packageRoot, 'tools', 'doctor.mjs')), false);
+  } finally {
+    rmSync(home, { recursive: true, force: true });
+  }
 });

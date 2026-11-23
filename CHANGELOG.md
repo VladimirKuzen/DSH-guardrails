@@ -14,6 +14,9 @@ Notable changes to the guardrail, newest first. Versions follow `dsh-guardrails/
   hash chain. `--deep` additionally lists bundles whose source mentions `tools/pre-execute` as **suspected**
   listeners; those findings never change the exit code. Exit `0` when every deterministic check passes, `1`
   when one fails, `2` on a usage error; a missing policy file is a warning (built-in defaults in use).
+- Doctor now runs when the profile reaches it through a junction (the Windows `link:` development
+  install): the entry-point check compares real paths instead of URL spellings, so the tool no longer
+  exits `0` without printing anything.
 - README gained an **Updating** subsection (an update replaces the installed version, leaves `policy.json` and
   `audit/` alone, and is verified with doctor) and a **Check the installation** section for doctor; the
   repository layout lists the new tool.
