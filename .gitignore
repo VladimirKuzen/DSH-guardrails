@@ -11,6 +11,9 @@ scripts/
 # Session prompt used to brief a new context; not part of the build docs
 /design/p4-kickoff-prompt.md
 
+# Local upgrade-drill runbook; kept on disk, not tracked
+/design/v1.5.2-upgrade-drill.md
+
 # Runtime data — never commit (root-level only; lib/audit is source)
 /audit/
 /vault/
